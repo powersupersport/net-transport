@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System;
 
-namespace ClassDev.Networking.Transport
+namespace ClassDev.Networking.Transport.LowLevel
 {
 	public class MessageManager
 	{
@@ -67,8 +67,11 @@ namespace ClassDev.Networking.Transport
 
 			isStarted = false;
 
-			while (sendThread.IsAlive || receiveThread.IsAlive)
-				continue;
+			if (sendThread.IsAlive)
+				sendThread.Join ();
+
+			if (receiveThread.IsAlive)
+				receiveThread.Join ();
 
 			sendThread = null;
 			receiveThread = null;
@@ -97,15 +100,26 @@ namespace ClassDev.Networking.Transport
 		Queue<Message> receiveQueue = new Queue<Message> ();
 
 		/// <summary>
-		/// Send a message.
+		/// Sends a message.
 		/// </summary>
 		public void Send (IPEndPoint endPoint, byte [] message)
 		{
-			sendQueue.Enqueue (new Message (endPoint, message));
+			Send (new Message (endPoint, message));
+		}
+		/// <summary>
+		/// Sends a message.
+		/// </summary>
+		/// <param name="message"></param>
+		public void Send (Message message)
+		{
+			if (message == null)
+				throw new ArgumentNullException ("The provided message to send is null.");
+
+			sendQueue.Enqueue (message);
 		}
 
 		/// <summary>
-		/// Receive a message from the queue. If there are none, null will be returned.
+		/// Receives a message from the queue. If there are none, null will be returned.
 		/// </summary>
 		public Message Receive ()
 		{
@@ -147,7 +161,7 @@ namespace ClassDev.Networking.Transport
 				while (sendQueue.Count > 0)
 				{
 					message = sendQueue.Dequeue ();
-					udpClient.Send (message.content, message.content.Length, message.endPoint);
+					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
 
 				if (!isStarted)
@@ -162,8 +176,9 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private void Threaded_ReceiveMessages ()
 		{
+			Message message = null;
 			IPEndPoint endPoint = new IPEndPoint (0, 0);
-			byte [] message = null;
+			byte [] messageContent = null;
 
 			while (true)
 			{
@@ -172,8 +187,9 @@ namespace ClassDev.Networking.Transport
 
 				try
 				{
-					message = udpClient.Receive (ref endPoint);
-					receiveQueue.Enqueue (new Message (endPoint, message));
+					messageContent = udpClient.Receive (ref endPoint);
+					message = new Message (endPoint, messageContent);
+					receiveQueue.Enqueue (message);
 				}
 				catch (SocketException)
 				{

@@ -1,0 +1,14 @@
+{
+    "name": "ClassDev.Networking.Transport",
+    "references": [
+        "GUID:312c9d6bf1ca9f84fa7e5e431c114516"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": []
+}
