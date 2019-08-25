@@ -108,7 +108,10 @@ namespace ClassDev.Networking.Transport
 			if (!isStarted)
 				return null;
 
-			Connection connection = new Connection (messageManager, messageHandler.connectionHandler, endPoint);
+			if (endPoint == null)
+				throw new System.ArgumentNullException ("You cannot connect to a null ip end point...");
+
+			Connection connection = new Connection (messageManager, messageHandler, endPoint);
 			connections [0] = connection;
 
 			return connection;
@@ -185,6 +188,7 @@ namespace ClassDev.Networking.Transport
 		private void SetupHandlers ()
 		{
 			messageHandler.connectionHandler = messageHandler.Register (HandleConnectionMessage);
+			messageHandler.keepAliveHandler = messageHandler.Register (HandleKeepAliveMessage);
 			messageHandler.disconnectionHandler = messageHandler.Register (HandleDisconnectionMessage);
 			messageHandler.acknowledgementHandler = messageHandler.Register (HandleAcknowledgementMessage);
 			messageHandler.multipleHandler = messageHandler.Register (HandleMultipleMessage);
@@ -201,8 +205,40 @@ namespace ClassDev.Networking.Transport
 		{
 			if (message.connection == null)
 			{
+				// TODO: Check for channels.
 				Connect (message.endPoint);
+				return;
 			}
+
+			message.connection.isSuccessful = true;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="message"></param>
+		public void HandleKeepAliveMessage (Message message)
+		{
+			if (message.connection == null)
+				return;
+
+			// TODO: Should have its own dedicated method.
+			if (!message.connection.isSuccessful)
+				message.connection.isSuccessful = true;
+
+			message.encoder.Decode (out int id);
+			message.encoder.Decode (out bool response);
+
+			if (response)
+			{
+				message.connection.HandleKeepAlive (id);
+				return;
+			}
+
+			Message newMessage = new Message (message.connection, messageHandler.keepAliveHandler, 0, 10);
+			newMessage.encoder.Encode (id);
+			newMessage.encoder.Encode (true);
+			messageManager.Send (newMessage);
 		}
 
 		/// <summary>

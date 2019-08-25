@@ -3,6 +3,7 @@
 	public class BaseHandler : MessageHandler
 	{
 		public MessageHandler connectionHandler;
+		public MessageHandler keepAliveHandler;
 		public MessageHandler disconnectionHandler;
 		public MessageHandler acknowledgementHandler;
 		public MessageHandler multipleHandler;
