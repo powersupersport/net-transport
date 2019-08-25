@@ -19,6 +19,11 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
+		private MessageChannelTemplate [] channelTemplates = null;
+
+		/// <summary>
+		/// 
+		/// </summary>
 		public Connection [] connections = null;
 
 		/// <summary>
@@ -41,12 +46,13 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="maxConnections"></param>
-		public ConnectionManager (MessageManager messageManager, BaseHandler messageHandler, int maxConnections)
+		public ConnectionManager (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler messageHandler, int maxConnections)
 		{
 			if (messageManager == null)
 				throw new System.Exception ("Connection manager cannot be created without a message manager.");
 
 			this.messageManager = messageManager;
+			this.channelTemplates = channelTemplates;
 			this.messageHandler = messageHandler;
 			this.maxConnections = maxConnections;
 		}
@@ -85,7 +91,7 @@ namespace ClassDev.Networking.Transport
 		/// <param name="port">The port of the remote host.</param>
 		/// <param name="timeout">For how long the connection attempt will last (in seconds).</param>
 		/// <returns>Data about the current state of the connection attempt.</returns>
-		public Connection Connect (string ipAddress, int port, float timeout = Connection.Timeout)
+		public Connection Connect (string ipAddress, int port, float timeout = Connection.Timeout, MessageChannelTemplate [] channelTemplates = null)
 		{
 			if (!isStarted)
 				return null;
@@ -103,15 +109,18 @@ namespace ClassDev.Networking.Transport
 		/// <param name="endPoint">The remote end point to connect to.</param>
 		/// <param name="timeout">For how long the connection attempt will last (in seconds).</param>
 		/// <returns>Data about the current state of the connection attempt.</returns>
-		public Connection Connect (IPEndPoint endPoint, float timeout = Connection.Timeout)
+		public Connection Connect (IPEndPoint endPoint, float timeout = Connection.Timeout, MessageChannelTemplate [] channelTemplates = null)
 		{
 			if (!isStarted)
 				return null;
 
 			if (endPoint == null)
-				throw new System.ArgumentNullException ("You cannot connect to a null ip end point...");
+				throw new System.ArgumentNullException ("endPoint", "You cannot connect to a null ip end point...");
 
-			Connection connection = new Connection (messageManager, messageHandler, endPoint);
+			if (channelTemplates == null)
+				channelTemplates = this.channelTemplates;
+
+			Connection connection = new Connection (messageManager, channelTemplates, messageHandler, endPoint);
 			connections [0] = connection;
 
 			return connection;

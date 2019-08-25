@@ -34,6 +34,11 @@ namespace ClassDev.Networking.Transport
 		public BaseHandler messageHandler { get; private set; }
 
 		/// <summary>
+		/// Defines the default channels for each connection.
+		/// </summary>
+		public MessageChannelTemplate [] channelTemplates { get; set; }
+
+		/// <summary>
 		/// The port on which the UDP client is running.
 		/// </summary>
 		public int port { get; private set; }
@@ -60,6 +65,7 @@ namespace ClassDev.Networking.Transport
 		{
 			isStarted = true;
 
+			// TODO: The message handler should be setup before starting the host.
 			SetupMessageHandler ();
 
 			SetupUdpClient ();
@@ -120,14 +126,20 @@ namespace ClassDev.Networking.Transport
 
 			Message message = new Message (lowLevelMessage);
 
-			message.encoder.Decode (out message.channelId);
-
 			message.connection = connectionManager.ResolveConnection (message.endPoint);
 			if (message.connection != null)
 			{
+				// The message channel ID is assigned in the message itself.
+				message.channel = message.connection.GetMessageChannelByIndex (message.channelId);
+				if (message.channel == null)
+					return null;
+
 				message.connection.EnqueueToReceive (message);
 				message = message.connection.DequeueFromReceive ();
 			}
+
+			if (message == null)
+				return null;
 
 			messageHandler.Handle (message);
 
@@ -208,7 +220,7 @@ namespace ClassDev.Networking.Transport
 			if (messageManager == null)
 				throw new Exception ("Cannot set up connection manager if the message manager is null.");
 
-			connectionManager = new ConnectionManager (messageManager, messageHandler, 10);
+			connectionManager = new ConnectionManager (messageManager, channelTemplates, messageHandler, 10);
 			connectionManager.Start ();
 		}
 

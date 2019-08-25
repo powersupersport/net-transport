@@ -94,6 +94,9 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void Handle (Message message)
 		{
+			if (message == null)
+				return;
+
 			if (optimizedHandlers == null)
 			{
 				if (callback == null)

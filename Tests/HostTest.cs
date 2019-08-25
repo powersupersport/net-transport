@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using ClassDev.Networking.Transport;
+using System.Net;
 
 namespace Tests
 {
@@ -18,7 +19,9 @@ namespace Tests
 			host1.Start ();
 			host2.Start ();
 
-			Message message = new Message (host2.endPoint, host1.messageHandler.genericHandler, 6);
+			IPEndPoint endPoint = new IPEndPoint (IPAddress.Parse ("127.0.0.1"), 7778);
+
+			Message message = new Message (endPoint, host1.messageHandler.genericHandler, 6);
 
 			host1.Send (message);
 

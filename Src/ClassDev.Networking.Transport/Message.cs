@@ -27,7 +27,16 @@ namespace ClassDev.Networking.Transport
 		{
 			ValidateHandler (handler);
 
+			this.connection = connection;
+
 			encoder.Encode (channelId);
+
+			channel = connection.GetMessageChannelByIndex (channelId);
+			if (channel == null)
+				throw new System.ArgumentNullException ("channelId", "The specified channel by id doesn't exist.");
+
+			encoder.position += channel.GetRequiredBufferOffset ();
+
 			encoder.Encode (handler.signature);
 		}
 
@@ -50,7 +59,7 @@ namespace ClassDev.Networking.Transport
 		/// <param name="lowLevelMessage"></param>
 		public Message (LowLevel.Message lowLevelMessage) : base (lowLevelMessage.endPoint, lowLevelMessage.buffer)
 		{
-
+			encoder.Decode (out channelId);
 		}
 
 		/// <summary>
@@ -60,10 +69,10 @@ namespace ClassDev.Networking.Transport
 		private void ValidateHandler (MessageHandler handler)
 		{
 			if (handler == null)
-				throw new System.ArgumentNullException ("The message cannot be created without a message handler. The handler is required, so the receiver knows how to understand the message.");
+				throw new System.ArgumentNullException ("handler", "The message cannot be created without a message handler. The handler is required, so the receiver knows how to understand the message.");
 
 			if (handler.signature == null)
-				throw new System.ArgumentException ("The handler you provided is either not optimized with Optimize(), or is only used as a branch for other handlers. Branch handlers cannot understand messages.");
+				throw new System.ArgumentException ("handler", "The handler you provided is either not optimized with Optimize(), or is only used as a branch for other handlers. Branch handlers cannot understand messages.");
 		}
 	}
 }

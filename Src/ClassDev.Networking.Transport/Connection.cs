@@ -99,12 +99,20 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="endPoint"></param>
-		public Connection (MessageManager messageManager, BaseHandler handler, IPEndPoint endPoint)
+		public Connection (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler handler, IPEndPoint endPoint)
 		{
 			this.messageManager = messageManager;
 
-			channels = new MessageChannel [1];
+			if (channelTemplates == null)
+				channelTemplates = new MessageChannelTemplate [0];
+
+			channels = new MessageChannel [channelTemplates.Length + 1];
 			channels [0] = new MessageChannel ();
+
+			for (int i = 0; i < channelTemplates.Length; i++)
+			{
+				channels [i + 1] = new MessageChannel (channelTemplates [i]);
+			}
 
 			this.endPoint = endPoint;
 
@@ -161,7 +169,7 @@ namespace ClassDev.Networking.Transport
 				if (message.channel == null)
 					return;
 			}
-
+			
 			message.channel.EnqueueToSend (message);
 		}
 

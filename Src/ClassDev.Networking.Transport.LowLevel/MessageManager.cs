@@ -104,7 +104,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 		public void Send (Message message)
 		{
 			if (message == null)
-				throw new ArgumentNullException ("The provided message to send is null.");
+				throw new ArgumentNullException ("message", "The provided message to send is null.");
 
 			sendQueue.Enqueue (message);
 		}
