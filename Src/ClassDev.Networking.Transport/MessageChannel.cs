@@ -4,6 +4,13 @@ namespace ClassDev.Networking.Transport
 {
 	public class MessageChannel
 	{
+		public const int ReliableResend = 100;
+
+		/// <summary>
+		/// The channel ID relative to the connection.
+		/// </summary>
+		public byte id { get; private set; }
+
 		/// <summary>
 		/// Just for info. Doesn't serve any function.
 		/// </summary>
@@ -11,34 +18,35 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Defines if the messages are reliable.
 		/// </summary>
-		public bool isReliable { get; private set; }
+		public bool isReliable { get; protected set; }
 		/// <summary>
 		/// Defines if the messages are going to be received in order.
 		/// </summary>
-		public bool isSequenced { get; private set; }
+		public bool isSequenced { get; protected set; }
 		/// <summary>
 		/// The sequence index for outgoing messages.
 		/// </summary>
-		private int sendSequenceIndex = 1;
+		protected int sendSequenceIndex = 1;
 		/// <summary>
 		/// The sequence index for incoming messages.
 		/// </summary>
-		public int receiveSequenceIndex = 0;
+		protected int receiveSequenceIndex = 0;
 
 		/// <summary>
 		/// The send queue.
 		/// </summary>
-		public Queue<Message> sendQueue;
+		protected Queue<Message> sendQueue;
 		/// <summary>
 		/// The receive queue.
 		/// </summary>
-		public Queue<Message> receiveQueue;
+		protected Queue<Message> receiveQueue;
 
 		/// <summary>
 		/// Constructor.
 		/// </summary>
-		/// <param name="template"></param>
-		public MessageChannel (MessageChannelTemplate template) : this (template.isReliable, template.isSequenced)
+		/// <param name="isReliable"></param>
+		/// <param name="isSequenced"></param>
+		public MessageChannel (byte id, bool isSequenced = false) : this (id, false, isSequenced)
 		{
 
 		}
@@ -48,8 +56,9 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="isReliable"></param>
 		/// <param name="isSequenced"></param>
-		public MessageChannel (bool isReliable = false, bool isSequenced = false)
+		protected MessageChannel (byte id, bool isReliable, bool isSequenced)
 		{
+			this.id = id;
 			this.isReliable = isReliable;
 			this.isSequenced = isSequenced;
 
@@ -61,17 +70,11 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		/// <param name="message"></param>
-		public void EnqueueToSend (Message message)
+		public virtual void EnqueueToSend (Message message)
 		{
 			if (isSequenced)
 			{
-				// The position must be kept and restored, because it's the length identifier of the message.
-				int currentPositon = (int)message.encoder.position;
-
-				message.encoder.position = sizeof (byte);
-				message.encoder.Encode (sendSequenceIndex);
-
-				message.encoder.position = currentPositon;
+				EncodeSequenceIndexInMessage (message);
 
 				sendSequenceIndex += 1;
 			}
@@ -83,7 +86,7 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		/// <returns></returns>
-		public Message DequeueFromSend ()
+		public virtual Message DequeueFromSend ()
 		{
 			if (sendQueue.Count <= 0)
 				return null;
@@ -95,7 +98,7 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		/// <param name="message"></param>
-		public void EnqueueToReceive (Message message)
+		public virtual void EnqueueToReceive (Message message)
 		{
 			if (isSequenced)
 			{
@@ -114,7 +117,7 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		/// <returns></returns>
-		public Message DequeueFromReceive ()
+		public virtual Message DequeueFromReceive ()
 		{
 			if (receiveQueue.Count <= 0)
 				return null;
@@ -125,8 +128,23 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
+		/// <param name="message"></param>
+		protected void EncodeSequenceIndexInMessage (Message message)
+		{
+			// The position must be kept and restored, because it's the length identifier of the message.
+			int currentPositon = (int)message.encoder.position;
+
+			message.encoder.position = sizeof (byte);
+			message.encoder.Encode (sendSequenceIndex);
+
+			message.encoder.position = currentPositon;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
 		/// <returns></returns>
-		public int GetRequiredBufferOffset ()
+		public virtual int GetRequiredBufferOffset ()
 		{
 			if (isSequenced)
 				return sizeof (int);

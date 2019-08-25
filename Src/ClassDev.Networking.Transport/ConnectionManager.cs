@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using ClassDev.Networking.Transport.LowLevel;
 
@@ -9,12 +10,12 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private BaseHandler messageHandler;
+		public BaseHandler messageHandler;
 
 		/// <summary>
 		/// 
 		/// </summary>
-		private MessageManager messageManager;
+		public MessageManager messageManager;
 
 		/// <summary>
 		/// 
@@ -44,6 +45,11 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
+		public Stopwatch stopwatch { get; private set; }
+
+		/// <summary>
+		/// 
+		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="maxConnections"></param>
 		public ConnectionManager (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler messageHandler, int maxConnections)
@@ -55,6 +61,9 @@ namespace ClassDev.Networking.Transport
 			this.channelTemplates = channelTemplates;
 			this.messageHandler = messageHandler;
 			this.maxConnections = maxConnections;
+
+			stopwatch = new Stopwatch ();
+			stopwatch.Start ();
 		}
 
 		/// <summary>
@@ -120,7 +129,7 @@ namespace ClassDev.Networking.Transport
 			if (channelTemplates == null)
 				channelTemplates = this.channelTemplates;
 
-			Connection connection = new Connection (messageManager, channelTemplates, messageHandler, endPoint);
+			Connection connection = new Connection (this, channelTemplates, endPoint);
 			connections [0] = connection;
 
 			return connection;
@@ -265,7 +274,20 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void HandleAcknowledgementMessage (Message message)
 		{
+			if (message.connection == null)
+				return;
 
+			message.encoder.Decode (out byte channelId);
+			message.encoder.Decode (out int sequenceIndex);
+
+			MessageChannel channel = message.connection.GetMessageChannelByIndex (channelId);
+			if (channel == null)
+				return;
+
+			if (!channel.isReliable)
+				return;
+
+			((ReliableMessageChannel)channel).Acknowledge (sequenceIndex);
 		}
 
 		/// <summary>

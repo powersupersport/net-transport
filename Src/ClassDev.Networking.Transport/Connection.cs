@@ -46,6 +46,11 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		private MessageHandler keepAliveHandler;
+		// TODO: Shouldn't be public
+		/// <summary>
+		/// 
+		/// </summary>
+		public MessageHandler acknowledgementHandler;
 		/// <summary>
 		/// 
 		/// </summary>
@@ -99,29 +104,31 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="endPoint"></param>
-		public Connection (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler handler, IPEndPoint endPoint)
+		public Connection (ConnectionManager connectionManager, MessageChannelTemplate [] channelTemplates, IPEndPoint endPoint)
 		{
-			this.messageManager = messageManager;
+			messageManager = connectionManager.messageManager;
+			connectionHandler = connectionManager.messageHandler.connectionHandler;
+			keepAliveHandler = connectionManager.messageHandler.keepAliveHandler;
+			disconnectionHandler = connectionManager.messageHandler.disconnectionHandler;
+			acknowledgementHandler = connectionManager.messageHandler.acknowledgementHandler;
+
+			stopwatch = connectionManager.stopwatch;
 
 			if (channelTemplates == null)
 				channelTemplates = new MessageChannelTemplate [0];
 
 			channels = new MessageChannel [channelTemplates.Length + 1];
-			channels [0] = new MessageChannel ();
+			channels [0] = new MessageChannel (0);
 
 			for (int i = 0; i < channelTemplates.Length; i++)
 			{
-				channels [i + 1] = new MessageChannel (channelTemplates [i]);
+				if (channelTemplates [i].isReliable)
+					channels [i + 1] = new ReliableMessageChannel ((byte)(i + 1), this, messageManager, acknowledgementHandler, stopwatch, channelTemplates [i].isSequenced);
+				else
+					channels [i + 1] = new MessageChannel ((byte)(i + 1), channelTemplates [i].isSequenced);
 			}
 
 			this.endPoint = endPoint;
-
-			connectionHandler = handler.connectionHandler;
-			keepAliveHandler = handler.keepAliveHandler;
-			disconnectionHandler = handler.disconnectionHandler;
-
-			stopwatch = new Stopwatch ();
-			stopwatch.Start ();
 		}
 
 		/// <summary>
@@ -147,6 +154,18 @@ namespace ClassDev.Networking.Transport
 
 			SendKeepAliveMessage ();
 			currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
+
+			for (int i = 0; i < channels.Length; i++)
+			{
+				Message message = null;
+				do
+				{
+					message = channels [i].DequeueFromSend ();
+					if (message != null)
+						messageManager.Send (message);
+				}
+				while (message != null);
+			}
 		}
 
 		/// <summary>
