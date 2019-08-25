@@ -146,7 +146,7 @@ namespace ClassDev.Networking.Transport
 			if (udpClient != null)
 				return;
 
-			IPAddress ipAddress = new IPAddress (new byte [] { 127, 0, 0, 1 });
+			IPAddress ipAddress = new IPAddress (new byte [] { 0, 0, 0, 0 });
 			endPoint = new IPEndPoint (ipAddress, port);
 
 			udpClient = new UdpClient (endPoint);

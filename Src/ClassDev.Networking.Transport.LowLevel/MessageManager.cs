@@ -130,23 +130,6 @@ namespace ClassDev.Networking.Transport.LowLevel
 		}
 
 		/// <summary>
-		/// Receive all messages from the queue.
-		/// </summary>
-		public Message [] ReceiveAll ()
-		{
-			int messageCount = receiveQueue.Count;
-
-			Message [] messages = new Message [messageCount];
-
-			for (int i = 0; i < messageCount; i++)
-			{
-				messages [i] = receiveQueue.Dequeue ();
-			}
-
-			return messages;
-		}
-
-		/// <summary>
 		/// Sends messages.
 		/// </summary>
 		private void Threaded_SendMessages ()
@@ -177,7 +160,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 		private void Threaded_ReceiveMessages ()
 		{
 			Message message = null;
-			IPEndPoint endPoint = new IPEndPoint (0, 0);
+			IPEndPoint endPoint = new IPEndPoint (IPAddress.Any, 0);
 			byte [] messageContent = null;
 
 			while (true)
@@ -193,7 +176,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 				}
 				catch (SocketException)
 				{
-
+					
 				}
 			}
 		}
