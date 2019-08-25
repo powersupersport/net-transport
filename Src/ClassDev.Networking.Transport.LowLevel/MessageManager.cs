@@ -8,15 +8,6 @@ namespace ClassDev.Networking.Transport.LowLevel
 {
 	public class MessageManager
 	{
-		#region Settings
-
-		/// <summary>
-		/// For how long the message thread is going to sleep each cycle.
-		/// </summary>
-		public int sleepTimeout = 5;
-
-		#endregion
-
 		#region Setup
 
 		/// <summary>
@@ -146,11 +137,6 @@ namespace ClassDev.Networking.Transport.LowLevel
 					message = sendQueue.Dequeue ();
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
-
-				if (!isStarted)
-					return;
-
-				Thread.Sleep (sleepTimeout);
 			}
 		}
 

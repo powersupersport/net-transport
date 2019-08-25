@@ -62,7 +62,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private List<KeepAlive> keepAlives = new List<KeepAlive> ();
+		private CircularArray<KeepAlive> keepAlives = new CircularArray<KeepAlive> (50);
 		/// <summary>
 		/// 
 		/// </summary>
@@ -250,7 +250,7 @@ namespace ClassDev.Networking.Transport
 			// TODO: Once the int is overloaded, it should wrap around.
 			keepAlive.time = (int)stopwatch.ElapsedMilliseconds;
 
-			keepAlives.Add (keepAlive);
+			keepAlives.Push (keepAlive);
 
 			currentKeepAliveId += 1;
 		}
@@ -264,18 +264,13 @@ namespace ClassDev.Networking.Transport
 			if (!isSuccessful)
 				isSuccessful = true;
 
-			for (int i = 0; i < keepAlives.Count; i++)
+			for (int i = 0; i < keepAlives.Length; i++)
 			{
 				if (keepAlives [i].id != id)
 					continue;
 
 				latestPing = (int)stopwatch.ElapsedMilliseconds - keepAlives [i].time;
 				averagePing = (averagePing + latestPing) / 2;
-
-				while (keepAlives.Count > 0 && keepAlives [0].id > 0 && keepAlives [0].id <= id)
-				{
-					keepAlives.RemoveAt (0);
-				}
 
 				break;
 			}
