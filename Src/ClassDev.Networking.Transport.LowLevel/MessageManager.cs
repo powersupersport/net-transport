@@ -117,6 +117,13 @@ namespace ClassDev.Networking.Transport.LowLevel
 			if (receiveQueue.Count <= 0)
 				return null;
 
+
+			if (UnityEngine.Random.Range (0, 100) > 50)
+			{
+				receiveQueue.Dequeue ();
+				return null;
+			}
+
 			return receiveQueue.Dequeue ();
 		}
 
@@ -135,6 +142,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 				while (sendQueue.Count > 0)
 				{
 					message = sendQueue.Dequeue ();
+					// TODO: Protect from null...
+					if (message.buffer == null)
+						UnityEngine.Debug.Log ("Buffer");
+					if (message.encoder == null)
+						UnityEngine.Debug.Log ("Encoder");
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
 			}

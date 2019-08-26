@@ -132,12 +132,24 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// Called from the connection manager.
+		/// This method is called from a thread in the connection manager!
 		/// </summary>
 		public void Update ()
 		{
 			if (isDisconnected)
 				return;
+
+			for (int i = 0; i < channels.Length; i++)
+			{
+				Message message = null;
+				do
+				{
+					message = channels [i].DequeueFromSend ();
+					if (message != null)
+						messageManager.Send (message);
+				}
+				while (message != null);
+			}
 
 			if (!isSuccessful)
 			{
@@ -154,18 +166,6 @@ namespace ClassDev.Networking.Transport
 
 			SendKeepAliveMessage ();
 			currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
-
-			for (int i = 0; i < channels.Length; i++)
-			{
-				Message message = null;
-				do
-				{
-					message = channels [i].DequeueFromSend ();
-					if (message != null)
-						messageManager.Send (message);
-				}
-				while (message != null);
-			}
 		}
 
 		/// <summary>

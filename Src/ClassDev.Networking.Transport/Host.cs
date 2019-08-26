@@ -102,17 +102,18 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			if (message.connection != null)
-			{
 				message.connection.EnqueueToSend (message);
-				message = message.connection.DequeueFromSend ();
-
-				if (message == null)
-					return;
-			}
-
-			messageManager.Send (message);
 		}
 
+		/// <summary>
+		/// A function to update the synchronous part of the code.
+		/// </summary>
+		public void Update ()
+		{
+			Receive ();
+		}
+
+		[Obsolete]
 		/// <summary>
 		/// Receives a message from the queue.
 		/// </summary>
