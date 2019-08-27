@@ -25,7 +25,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private bool sentReliableCopiesLock = false;
+		private readonly object sentReliableCopiesLock = new object ();
 		/// <summary>
 		/// 
 		/// </summary>
@@ -81,20 +81,19 @@ namespace ClassDev.Networking.Transport
 			Message message = null;
 
 			// TODO: Reliable unsequenced there is a problem, another thread modifies sent reliable copies.
-			while (sentReliableCopiesLock)
-				continue;
 
-			sentReliableCopiesLock = true;
-			for (int i = 0; i < sentReliableCopies.Count; i++)
+			lock (sentReliableCopiesLock)
 			{
-				if ((int)stopwatch.ElapsedMilliseconds - sentReliableCopies [i].time < ReliableResend)
-					continue;
+				for (int i = 0; i < sentReliableCopies.Count; i++)
+				{
+					if ((int)stopwatch.ElapsedMilliseconds - sentReliableCopies [i].time < ReliableResend)
+						continue;
 
-				sentReliableCopies [i].time = (int)stopwatch.ElapsedMilliseconds;
-				message = sentReliableCopies [i].message;
-				break;
+					sentReliableCopies [i].time = (int)stopwatch.ElapsedMilliseconds;
+					message = sentReliableCopies [i].message;
+					break;
+				}
 			}
-			sentReliableCopiesLock = false;
 
 			if (message != null)
 				return message;
@@ -199,20 +198,17 @@ namespace ClassDev.Networking.Transport
 		/// <param name="sequenceIndex"></param>
 		public void Acknowledge (int sequenceIndex)
 		{
-			while (sentReliableCopiesLock)
-				continue;
-
-			sentReliableCopiesLock = true;
-			for (int i = 0; i < sentReliableCopies.Count; i++)
+			lock (sentReliableCopiesLock)
 			{
-				if (sentReliableCopies [i].sequenceIndex == sequenceIndex)
+				for (int i = 0; i < sentReliableCopies.Count; i++)
 				{
-					sentReliableCopies.RemoveAt (i);
-					sentReliableCopiesLock = false;
-					return;
+					if (sentReliableCopies [i].sequenceIndex == sequenceIndex)
+					{
+						sentReliableCopies.RemoveAt (i);
+						return;
+					}
 				}
 			}
-			sentReliableCopiesLock = false;
 		}
 
 		/// <summary>

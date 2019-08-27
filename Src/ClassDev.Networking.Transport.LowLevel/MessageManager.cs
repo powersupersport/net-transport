@@ -91,6 +91,15 @@ namespace ClassDev.Networking.Transport.LowLevel
 		Queue<Message> receiveQueue = new Queue<Message> ();
 
 		/// <summary>
+		/// 
+		/// </summary>
+		private readonly object sendQueueLock = new object ();
+		/// <summary>
+		/// 
+		/// </summary>
+		private readonly object receiveQueueLock = new object ();
+
+		/// <summary>
 		/// Sends a message.
 		/// </summary>
 		public void Send (IPEndPoint endPoint, byte [] message)
@@ -106,7 +115,10 @@ namespace ClassDev.Networking.Transport.LowLevel
 			if (message == null)
 				throw new ArgumentNullException ("message", "The provided message to send is null.");
 
-			sendQueue.Enqueue (message);
+			lock (sendQueueLock)
+			{
+				sendQueue.Enqueue (message);
+			}
 		}
 
 		/// <summary>
@@ -117,14 +129,16 @@ namespace ClassDev.Networking.Transport.LowLevel
 			if (receiveQueue.Count <= 0)
 				return null;
 
-
 			if (UnityEngine.Random.Range (0, 100) > 50)
 			{
 				receiveQueue.Dequeue ();
 				return null;
 			}
 
-			return receiveQueue.Dequeue ();
+			lock (receiveQueueLock)
+			{
+				return receiveQueue.Dequeue ();
+			}
 		}
 
 		/// <summary>
@@ -141,12 +155,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 
 				while (sendQueue.Count > 0)
 				{
-					message = sendQueue.Dequeue ();
-					// TODO: Protect from null...
-					if (message.buffer == null)
-						UnityEngine.Debug.Log ("Buffer");
-					if (message.encoder == null)
-						UnityEngine.Debug.Log ("Encoder");
+					lock (sendQueueLock)
+					{
+						message = sendQueue.Dequeue ();
+					}
+
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
 			}
@@ -170,7 +183,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 				{
 					messageContent = udpClient.Receive (ref endPoint);
 					message = new Message (endPoint, messageContent);
-					receiveQueue.Enqueue (message);
+
+					lock (receiveQueueLock)
+					{
+						receiveQueue.Enqueue (message);
+					}
 				}
 				catch (SocketException)
 				{

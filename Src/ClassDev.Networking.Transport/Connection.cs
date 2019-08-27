@@ -139,17 +139,14 @@ namespace ClassDev.Networking.Transport
 			if (isDisconnected)
 				return;
 
-			for (int i = 0; i < channels.Length; i++)
+			Message message = null;
+			do
 			{
-				Message message = null;
-				do
-				{
-					message = channels [i].DequeueFromSend ();
-					if (message != null)
-						messageManager.Send (message);
-				}
-				while (message != null);
+				message = DequeueFromSend ();
+				if (message != null)
+					messageManager.Send (message);
 			}
+			while (message != null);
 
 			if (!isSuccessful)
 			{
@@ -188,9 +185,11 @@ namespace ClassDev.Networking.Transport
 				if (message.channel == null)
 					return;
 			}
-			
+
 			message.channel.EnqueueToSend (message);
 		}
+
+		// TODO: Drop unreliable messages if the buffer is overloaded
 
 		/// <summary>
 		/// 
@@ -290,6 +289,8 @@ namespace ClassDev.Networking.Transport
 		{
 			if (!isSuccessful)
 				isSuccessful = true;
+
+			// TODO: Ping calculation seems to stop if the message buffers are overloaded.
 
 			for (int i = 0; i < keepAlives.Length; i++)
 			{

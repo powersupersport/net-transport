@@ -191,6 +191,8 @@ namespace ClassDev.Networking.Transport
 				if (!isStarted)
 					return;
 
+				// TODO: Might need a lock...
+
 				for (i = 0; i < maxConnections; i++)
 				{
 					if (connections [i] == null)
@@ -244,6 +246,7 @@ namespace ClassDev.Networking.Transport
 			if (!message.connection.isSuccessful)
 				message.connection.isSuccessful = true;
 
+			// TODO: Try catch
 			message.encoder.Decode (out int id);
 			message.encoder.Decode (out bool response);
 
@@ -277,6 +280,7 @@ namespace ClassDev.Networking.Transport
 			if (message.connection == null)
 				return;
 
+			// TODO: Try catch
 			message.encoder.Decode (out byte channelId);
 			message.encoder.Decode (out int sequenceIndex);
 
