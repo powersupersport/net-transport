@@ -5,6 +5,8 @@ namespace ClassDev.Networking.Transport
 {
 	public class ReliableMessageChannel : MessageChannel
 	{
+		public const int ReliableResend = 100;
+
 		class ReliableCopy
 		{
 			public int sequenceIndex;
@@ -34,10 +36,6 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private Connection connection;
-		/// <summary>
-		/// 
-		/// </summary>
 		private LowLevel.MessageManager messageManager;
 		/// <summary>
 		/// 
@@ -52,7 +50,7 @@ namespace ClassDev.Networking.Transport
 		/// Constructor.
 		/// </summary>
 		/// <param name="isSequenced"></param>
-		public ReliableMessageChannel (byte id, Connection connection, LowLevel.MessageManager messageManager, MessageHandler acknowledgementHandler, Stopwatch stopwatch, bool isSequenced = false) : base (id, true, isSequenced)
+		public ReliableMessageChannel (Connection connection, LowLevel.MessageManager messageManager, MessageHandler acknowledgementHandler, Stopwatch stopwatch, byte id, bool isSequenced = false) : base (connection, id, true, isSequenced)
 		{
 			sentReliableCopies = new List<ReliableCopy> ();
 			receivedReliableCopies = new CircularArray<ReliableCopy> (128);

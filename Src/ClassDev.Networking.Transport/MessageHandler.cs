@@ -108,7 +108,16 @@ namespace ClassDev.Networking.Transport
 				return;
 			}
 
-			message.encoder.Decode (out byte id);
+			byte id = 0;
+
+			try
+			{
+				message.encoder.Decode (out id);
+			}
+			catch (System.Exception)
+			{
+				return;
+			}
 
 			if (id >= optimizedHandlers.Length)
 				// TODO: Throw an exception.

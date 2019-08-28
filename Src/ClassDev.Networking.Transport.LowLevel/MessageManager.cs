@@ -131,7 +131,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 
 			if (UnityEngine.Random.Range (0, 100) > 50)
 			{
-				receiveQueue.Dequeue ();
+				lock (receiveQueueLock)
+				{
+					receiveQueue.Dequeue ();
+				}
+
 				return null;
 			}
 

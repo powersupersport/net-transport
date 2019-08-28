@@ -8,6 +8,11 @@ namespace ClassDev.Networking.Transport
 	public class Connection
 	{
 		/// <summary>
+		/// The connection identifier.
+		/// </summary>
+		public int id { get; private set; }
+
+		/// <summary>
 		/// 
 		/// </summary>
 		public const int Timeout = 10000;
@@ -46,11 +51,10 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		private MessageHandler keepAliveHandler;
-		// TODO: Shouldn't be public
 		/// <summary>
 		/// 
 		/// </summary>
-		public MessageHandler acknowledgementHandler;
+		private MessageHandler acknowledgementHandler;
 		/// <summary>
 		/// 
 		/// </summary>
@@ -93,19 +97,30 @@ namespace ClassDev.Networking.Transport
 			get => averagePing;
 		}
 
-		// TODO: Could be moved into the host or connection manager instead.
 		/// <summary>
 		/// 
 		/// </summary>
-		private Stopwatch stopwatch;
+		public readonly Stopwatch stopwatch;
+
+		/// <summary>
+		/// The circular index used to browse progressively through the channels and dequeue messages to send.
+		/// </summary>
+		private int currentSendChannelIndex = 0;
+
+		/// <summary>
+		/// The circular index used to browse progressively through the channels and dequeue messages to receive.
+		/// </summary>
+		private int currentReceiveChannelIndex = 0;
 
 		/// <summary>
 		/// 
 		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="endPoint"></param>
-		public Connection (ConnectionManager connectionManager, MessageChannelTemplate [] channelTemplates, IPEndPoint endPoint)
+		public Connection (ConnectionManager connectionManager, MessageChannelTemplate [] channelTemplates, IPEndPoint endPoint, int id)
 		{
+			this.id = id;
+
 			messageManager = connectionManager.messageManager;
 			connectionHandler = connectionManager.messageHandler.connectionHandler;
 			keepAliveHandler = connectionManager.messageHandler.keepAliveHandler;
@@ -118,14 +133,14 @@ namespace ClassDev.Networking.Transport
 				channelTemplates = new MessageChannelTemplate [0];
 
 			channels = new MessageChannel [channelTemplates.Length + 1];
-			channels [0] = new MessageChannel (0);
+			channels [0] = new MessageChannel (this, 0);
 
 			for (int i = 0; i < channelTemplates.Length; i++)
 			{
 				if (channelTemplates [i].isReliable)
-					channels [i + 1] = new ReliableMessageChannel ((byte)(i + 1), this, messageManager, acknowledgementHandler, stopwatch, channelTemplates [i].isSequenced);
+					channels [i + 1] = new ReliableMessageChannel (this, messageManager, acknowledgementHandler, stopwatch, (byte)(i + 1), channelTemplates [i].isSequenced);
 				else
-					channels [i + 1] = new MessageChannel ((byte)(i + 1), channelTemplates [i].isSequenced);
+					channels [i + 1] = new MessageChannel (this, (byte)(i + 1), channelTemplates [i].isSequenced);
 			}
 
 			this.endPoint = endPoint;
@@ -170,7 +185,15 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public void Disconnect ()
 		{
+			if (isDisconnected)
+				return;
+
 			isDisconnected = true;
+
+			for (int i = 0; i < 3; i++)
+			{
+				SendDisconnectionMessage ();
+			}
 		}
 
 		/// <summary>
@@ -179,6 +202,9 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void EnqueueToSend (Message message)
 		{
+			if (isDisconnected)
+				return;
+
 			if (message.channel == null)
 			{
 				message.channel = GetMessageChannelByIndex (message.channelId);
@@ -186,10 +212,9 @@ namespace ClassDev.Networking.Transport
 					return;
 			}
 
+			message.SetTime ((int)stopwatch.ElapsedMilliseconds);
 			message.channel.EnqueueToSend (message);
 		}
-
-		// TODO: Drop unreliable messages if the buffer is overloaded
 
 		/// <summary>
 		/// 
@@ -197,15 +222,19 @@ namespace ClassDev.Networking.Transport
 		/// <returns></returns>
 		public Message DequeueFromSend ()
 		{
+			if (isDisconnected)
+				return null;
+
 			Message message = null;
-			// TODO: The channel index should be an incremental value.
-			// This is because if the first channel has lots of messages, the other channels will get delayed significantly.
-			for (int i = 0; i < channels.Length; i++)
-			{
-				message = channels [i].DequeueFromSend ();
-				if (message != null)
-					return message;
-			}
+
+			message = channels [currentSendChannelIndex].DequeueFromSend ();
+			currentSendChannelIndex += 1;
+
+			if (currentSendChannelIndex >= channels.Length)
+				currentSendChannelIndex = 0;
+
+			if (message != null)
+				return message;
 
 			return null;
 		}
@@ -216,6 +245,9 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void EnqueueToReceive (Message message)
 		{
+			if (isDisconnected)
+				return;
+
 			if (message.channel == null)
 			{
 				message.channel = GetMessageChannelByIndex (message.channelId);
@@ -223,6 +255,7 @@ namespace ClassDev.Networking.Transport
 					return;
 			}
 
+			message.SetTime ((int)stopwatch.ElapsedMilliseconds);
 			message.channel.EnqueueToReceive (message);
 		}
 
@@ -232,15 +265,19 @@ namespace ClassDev.Networking.Transport
 		/// <returns></returns>
 		public Message DequeueFromReceive ()
 		{
+			if (isDisconnected)
+				return null;
+
 			Message message = null;
-			// TODO: The channel index should be an incremental value.
-			// This is because if the first channel has lots of messages, the other channels will get delayed significantly.
-			for (int i = 0; i < channels.Length; i++)
-			{
-				message = channels [i].DequeueFromReceive ();
-				if (message != null)
-					return message;
-			}
+
+			message = channels [currentReceiveChannelIndex].DequeueFromReceive ();
+			currentReceiveChannelIndex += 1;
+
+			if (currentReceiveChannelIndex >= channels.Length)
+				currentReceiveChannelIndex = 0;
+
+			if (message != null)
+				return message;
 
 			return null;
 		}
@@ -254,7 +291,7 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			Message message = new Message (this, connectionHandler, 0, 10);
-			messageManager.Send (message);
+			EnqueueToSend (message);
 		}
 
 		/// <summary>
@@ -269,7 +306,7 @@ namespace ClassDev.Networking.Transport
 			message.encoder.Encode (currentKeepAliveId);
 			message.encoder.Encode (false);
 
-			messageManager.Send (message);
+			EnqueueToSend (message);
 
 			KeepAlive keepAlive = new KeepAlive ();
 			keepAlive.id = currentKeepAliveId;
@@ -287,6 +324,9 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void HandleKeepAlive (int id)
 		{
+			if (isDisconnected)
+				return;
+
 			if (!isSuccessful)
 				isSuccessful = true;
 
@@ -309,7 +349,9 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private void SendDisconnectionMessage ()
 		{
-
+			Message message = new Message (this, disconnectionHandler, 0, 1);
+			message.encoder.Encode (0);
+			messageManager.Send (message);
 		}
 
 		/// <summary>

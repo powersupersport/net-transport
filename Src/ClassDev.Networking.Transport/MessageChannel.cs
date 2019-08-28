@@ -4,7 +4,7 @@ namespace ClassDev.Networking.Transport
 {
 	public class MessageChannel
 	{
-		public const int ReliableResend = 100;
+		public const int UnreliableDropTimeout = 200;
 
 		/// <summary>
 		/// The channel ID relative to the connection.
@@ -42,11 +42,16 @@ namespace ClassDev.Networking.Transport
 		protected Queue<Message> receiveQueue;
 
 		/// <summary>
+		/// 
+		/// </summary>
+		protected Connection connection;
+
+		/// <summary>
 		/// Constructor.
 		/// </summary>
 		/// <param name="isReliable"></param>
 		/// <param name="isSequenced"></param>
-		public MessageChannel (byte id, bool isSequenced = false) : this (id, false, isSequenced)
+		public MessageChannel (Connection connection, byte id, bool isSequenced = false) : this (connection, id, false, isSequenced)
 		{
 
 		}
@@ -56,8 +61,10 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="isReliable"></param>
 		/// <param name="isSequenced"></param>
-		protected MessageChannel (byte id, bool isReliable, bool isSequenced)
+		protected MessageChannel (Connection connection, byte id, bool isReliable, bool isSequenced)
 		{
+			this.connection = connection;
+
 			this.id = id;
 			this.isReliable = isReliable;
 			this.isSequenced = isSequenced;
@@ -88,10 +95,18 @@ namespace ClassDev.Networking.Transport
 		/// <returns></returns>
 		public virtual Message DequeueFromSend ()
 		{
-			if (sendQueue.Count <= 0)
-				return null;
+			Message message = null;
 
-			return sendQueue.Dequeue ();
+			do
+			{
+				if (sendQueue.Count <= 0)
+					return null;
+
+				message = sendQueue.Dequeue ();
+			}
+			while (connection.stopwatch.ElapsedMilliseconds - message.time > UnreliableDropTimeout);
+
+			return message;
 		}
 
 		/// <summary>
@@ -102,7 +117,16 @@ namespace ClassDev.Networking.Transport
 		{
 			if (isSequenced)
 			{
-				message.encoder.Decode (out int sequenceIndex);
+				int sequenceIndex = 0;
+
+				try
+				{
+					message.encoder.Decode (out sequenceIndex);
+				}
+				catch (System.Exception)
+				{
+					return;
+				}
 
 				if (sequenceIndex <= receiveSequenceIndex)
 					return;
@@ -119,10 +143,18 @@ namespace ClassDev.Networking.Transport
 		/// <returns></returns>
 		public virtual Message DequeueFromReceive ()
 		{
-			if (receiveQueue.Count <= 0)
-				return null;
+			Message message = null;
 
-			return receiveQueue.Dequeue ();
+			do
+			{
+				if (receiveQueue.Count <= 0)
+					return null;
+
+				message = receiveQueue.Dequeue ();
+			}
+			while (connection.stopwatch.ElapsedMilliseconds - message.time > UnreliableDropTimeout);
+
+			return message;
 		}
 
 		/// <summary>

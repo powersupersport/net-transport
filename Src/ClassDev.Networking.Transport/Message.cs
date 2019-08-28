@@ -7,7 +7,13 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// The channel id.
 		/// </summary>
-		public byte channelId = 0;
+		public readonly byte channelId = 0;
+
+		/// <summary>
+		/// The network time in milliseconds when the message has been created.
+		/// </summary>
+		public int time { get; private set; }
+
 		/// <summary>
 		/// The channel used to send/receive this message.
 		/// </summary>
@@ -23,7 +29,7 @@ namespace ClassDev.Networking.Transport
 		/// <param name="connection"></param>
 		/// <param name="channel"></param>
 		/// <param name="bufferSize"></param>
-		public Message (Connection connection, MessageHandler handler, byte channelId, int bufferSize = BufferSize) : base (connection.endPoint, bufferSize)
+		public Message (Connection connection, MessageHandler handler, byte channelId, int bufferSize = BufferSize) : base (connection.endPoint, bufferSize + 5)
 		{
 			ValidateHandler (handler);
 
@@ -45,7 +51,7 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		/// <param name="endPoint"></param>
 		/// <param name="bufferSize"></param>
-		public Message (IPEndPoint endPoint, MessageHandler handler, int bufferSize = BufferSize) : base (endPoint, bufferSize)
+		public Message (IPEndPoint endPoint, MessageHandler handler, int bufferSize = BufferSize) : base (endPoint, bufferSize + 5)
 		{
 			ValidateHandler (handler);
 
@@ -59,7 +65,19 @@ namespace ClassDev.Networking.Transport
 		/// <param name="lowLevelMessage"></param>
 		public Message (LowLevel.Message lowLevelMessage) : base (lowLevelMessage.endPoint, lowLevelMessage.buffer)
 		{
-			encoder.Decode (out channelId);
+			try
+			{
+				encoder.Decode (out channelId);
+			}
+			catch (System.Exception)
+			{
+				channelId = 0;
+			}
+		}
+
+		public void SetTime (int time)
+		{
+			this.time = time;
 		}
 
 		/// <summary>

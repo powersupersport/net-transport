@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Net;
 using System;
+using System.Diagnostics;
 
 namespace ClassDev.Networking.Transport
 {
@@ -34,6 +35,11 @@ namespace ClassDev.Networking.Transport
 		public BaseHandler messageHandler { get; private set; }
 
 		/// <summary>
+		/// Keeps track of time in milliseconds.
+		/// </summary>
+		public Stopwatch stopwatch { get; private set; }
+
+		/// <summary>
 		/// Defines the default channels for each connection.
 		/// </summary>
 		public MessageChannelTemplate [] channelTemplates { get; set; }
@@ -63,7 +69,13 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public void Start ()
 		{
+			if (isStarted)
+				return;
+
 			isStarted = true;
+
+			stopwatch = new Stopwatch ();
+			stopwatch.Start ();
 
 			// TODO: The message handler should be setup before starting the host.
 			SetupMessageHandler ();
@@ -80,6 +92,9 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public void Stop ()
 		{
+			if (!isStarted)
+				return;
+
 			isStarted = false;
 
 			ShutdownMessageHandler ();
@@ -89,6 +104,11 @@ namespace ClassDev.Networking.Transport
 			ShutdownMessageManager ();
 
 			ShutdownUdpClient ();
+
+			stopwatch.Stop ();
+			stopwatch = null;
+
+			GC.Collect ();
 		}
 
 		/// <summary>
@@ -103,6 +123,8 @@ namespace ClassDev.Networking.Transport
 
 			if (message.connection != null)
 				message.connection.EnqueueToSend (message);
+
+			// TODO: What if there is no connection?
 		}
 
 		/// <summary>
@@ -221,7 +243,7 @@ namespace ClassDev.Networking.Transport
 			if (messageManager == null)
 				throw new Exception ("Cannot set up connection manager if the message manager is null.");
 
-			connectionManager = new ConnectionManager (messageManager, channelTemplates, messageHandler, 10);
+			connectionManager = new ConnectionManager (messageManager, channelTemplates, messageHandler, stopwatch, 10);
 			connectionManager.Start ();
 		}
 

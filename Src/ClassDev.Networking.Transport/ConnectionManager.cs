@@ -37,6 +37,12 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public int maxConnections = 1;
 
+		// TODO: Fix public
+		/// <summary>
+		/// 
+		/// </summary>
+		public Stopwatch stopwatch;
+
 		/// <summary>
 		/// 
 		/// </summary>
@@ -45,14 +51,9 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		public Stopwatch stopwatch { get; private set; }
-
-		/// <summary>
-		/// 
-		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="maxConnections"></param>
-		public ConnectionManager (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler messageHandler, int maxConnections)
+		public ConnectionManager (MessageManager messageManager, MessageChannelTemplate [] channelTemplates, BaseHandler messageHandler, Stopwatch stopwatch, int maxConnections)
 		{
 			if (messageManager == null)
 				throw new System.Exception ("Connection manager cannot be created without a message manager.");
@@ -62,8 +63,7 @@ namespace ClassDev.Networking.Transport
 			this.messageHandler = messageHandler;
 			this.maxConnections = maxConnections;
 
-			stopwatch = new Stopwatch ();
-			stopwatch.Start ();
+			this.stopwatch = stopwatch;
 		}
 
 		/// <summary>
@@ -129,10 +129,23 @@ namespace ClassDev.Networking.Transport
 			if (channelTemplates == null)
 				channelTemplates = this.channelTemplates;
 
-			Connection connection = new Connection (this, channelTemplates, endPoint);
-			connections [0] = connection;
+			int index = GetFreeConnectionIndex ();
+			if (index < 0)
+				throw new System.Exception ("Connection limit reached!");
+
+			Connection connection = new Connection (this, channelTemplates, endPoint, index);
+			connections [index] = connection;
 
 			return connection;
+		}
+
+		/// <summary>
+		/// Disconnects a connection.
+		/// </summary>
+		/// <param name="connection"></param>
+		public void Disconnect (Connection connection)
+		{
+			connection.Disconnect ();
 		}
 
 		/// <summary>
@@ -148,11 +161,29 @@ namespace ClassDev.Networking.Transport
 				if (connections [i] == null)
 					continue;
 
+				if (connections [i].isDisconnected)
+					continue;
+
 				if (Equals (connections [i].endPoint, endPoint))
 					return connections [i];
 			}
 
 			return null;
+		}
+
+		/// <summary>
+		/// Returns a free index for a connection to take over.
+		/// </summary>
+		/// <returns></returns>
+		private int GetFreeConnectionIndex ()
+		{
+			for (int i = 0; i < connections.Length; i++)
+			{
+				if (connections [i] == null)
+					return i;
+			}
+
+			return -1;
 		}
 
 		/// <summary>
@@ -246,9 +277,18 @@ namespace ClassDev.Networking.Transport
 			if (!message.connection.isSuccessful)
 				message.connection.isSuccessful = true;
 
-			// TODO: Try catch
-			message.encoder.Decode (out int id);
-			message.encoder.Decode (out bool response);
+			int id = 0;
+			bool response = false;
+
+			try
+			{
+				message.encoder.Decode (out id);
+				message.encoder.Decode (out response);
+			}
+			catch (System.Exception)
+			{
+				return;
+			}
 
 			if (response)
 			{
@@ -268,7 +308,11 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		public void HandleDisconnectionMessage (Message message)
 		{
+			if (message.connection == null)
+				return;
 
+			message.connection.Disconnect ();
+			connections [message.connection.id] = null;
 		}
 
 		/// <summary>
@@ -280,9 +324,18 @@ namespace ClassDev.Networking.Transport
 			if (message.connection == null)
 				return;
 
-			// TODO: Try catch
-			message.encoder.Decode (out byte channelId);
-			message.encoder.Decode (out int sequenceIndex);
+			byte channelId = 0;
+			int sequenceIndex = 0;
+
+			try
+			{
+				message.encoder.Decode (out channelId);
+				message.encoder.Decode (out sequenceIndex);
+			}
+			catch (System.Exception)
+			{
+				return;
+			}
 
 			MessageChannel channel = message.connection.GetMessageChannelByIndex (channelId);
 			if (channel == null)
