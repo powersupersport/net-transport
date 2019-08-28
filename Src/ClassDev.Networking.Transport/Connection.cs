@@ -8,11 +8,6 @@ namespace ClassDev.Networking.Transport
 	public class Connection
 	{
 		/// <summary>
-		/// The connection identifier.
-		/// </summary>
-		public int id { get; private set; }
-
-		/// <summary>
 		/// 
 		/// </summary>
 		public const int Timeout = 10000;
@@ -20,6 +15,11 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		public const int Frequency = 200;
+
+		/// <summary>
+		/// The connection identifier.
+		/// </summary>
+		public int id { get; private set; }
 
 		/// <summary>
 		/// 
@@ -31,9 +31,19 @@ namespace ClassDev.Networking.Transport
 		public bool isDisconnected = false;
 
 		/// <summary>
+		/// The time when the disconnection occurrs.
+		/// </summary>
+		public long disconnectionTime { get; private set; }
+
+		/// <summary>
 		/// 
 		/// </summary>
 		private MessageManager messageManager;
+		/// <summary>
+		/// 
+		/// </summary>
+		public IPEndPoint endPoint = null;
+
 		/// <summary>
 		/// 
 		/// </summary>
@@ -41,7 +51,11 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		public IPEndPoint endPoint = null;
+		private readonly object sendChannelLock = new object ();
+		/// <summary>
+		/// 
+		/// </summary>
+		private readonly object receiveChannelLock = new object ();
 
 		/// <summary>
 		/// 
@@ -66,12 +80,17 @@ namespace ClassDev.Networking.Transport
 		private struct KeepAlive
 		{
 			public int id;
-			public int time;
+			public long time;
 		}
 		/// <summary>
 		/// 
 		/// </summary>
 		private CircularArray<KeepAlive> keepAlives = new CircularArray<KeepAlive> (50);
+		/// <summary>
+		/// Thread lock for keep alive records.
+		/// </summary>
+		private readonly object keepAlivesLock = new object ();
+
 		/// <summary>
 		/// 
 		/// </summary>
@@ -147,40 +166,6 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// This method is called from a thread in the connection manager!
-		/// </summary>
-		public void Update ()
-		{
-			if (isDisconnected)
-				return;
-
-			Message message = null;
-			do
-			{
-				message = DequeueFromSend ();
-				if (message != null)
-					messageManager.Send (message);
-			}
-			while (message != null);
-
-			if (!isSuccessful)
-			{
-				if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
-					return;
-
-				SendConnectionMessage ();
-				currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
-				return;
-			}
-
-			if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
-				return;
-
-			SendKeepAliveMessage ();
-			currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
-		}
-
-		/// <summary>
 		/// 
 		/// </summary>
 		public void Disconnect ()
@@ -189,6 +174,7 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			isDisconnected = true;
+			disconnectionTime = stopwatch.ElapsedMilliseconds;
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -212,8 +198,12 @@ namespace ClassDev.Networking.Transport
 					return;
 			}
 
-			message.SetTime ((int)stopwatch.ElapsedMilliseconds);
-			message.channel.EnqueueToSend (message);
+			message.SetTime (stopwatch.ElapsedMilliseconds);
+
+			lock (sendChannelLock)
+			{
+				message.channel.EnqueueToSend (message);
+			}
 		}
 
 		/// <summary>
@@ -227,7 +217,10 @@ namespace ClassDev.Networking.Transport
 
 			Message message = null;
 
-			message = channels [currentSendChannelIndex].DequeueFromSend ();
+			lock (sendChannelLock)
+			{
+				message = channels [currentSendChannelIndex].DequeueFromSend ();
+			}
 			currentSendChannelIndex += 1;
 
 			if (currentSendChannelIndex >= channels.Length)
@@ -255,8 +248,11 @@ namespace ClassDev.Networking.Transport
 					return;
 			}
 
-			message.SetTime ((int)stopwatch.ElapsedMilliseconds);
-			message.channel.EnqueueToReceive (message);
+			message.SetTime (stopwatch.ElapsedMilliseconds);
+			lock (receiveChannelLock)
+			{
+				message.channel.EnqueueToReceive (message);
+			}
 		}
 
 		/// <summary>
@@ -270,7 +266,10 @@ namespace ClassDev.Networking.Transport
 
 			Message message = null;
 
-			message = channels [currentReceiveChannelIndex].DequeueFromReceive ();
+			lock (receiveChannelLock)
+			{
+				message = channels [currentReceiveChannelIndex].DequeueFromReceive ();
+			}
 			currentReceiveChannelIndex += 1;
 
 			if (currentReceiveChannelIndex >= channels.Length)
@@ -310,11 +309,14 @@ namespace ClassDev.Networking.Transport
 
 			KeepAlive keepAlive = new KeepAlive ();
 			keepAlive.id = currentKeepAliveId;
-			// TODO: Once the int is overloaded, it should wrap around.
-			keepAlive.time = (int)stopwatch.ElapsedMilliseconds;
+			keepAlive.time = stopwatch.ElapsedMilliseconds;
 
-			keepAlives.Push (keepAlive);
+			lock (keepAlivesLock)
+			{
+				keepAlives.Push (keepAlive);
+			}
 
+			// TODO: Once overloaded, it should wrap around
 			currentKeepAliveId += 1;
 		}
 
@@ -332,15 +334,18 @@ namespace ClassDev.Networking.Transport
 
 			// TODO: Ping calculation seems to stop if the message buffers are overloaded.
 
-			for (int i = 0; i < keepAlives.Length; i++)
+			lock (keepAlivesLock)
 			{
-				if (keepAlives [i].id != id)
-					continue;
+				for (int i = 0; i < keepAlives.Length; i++)
+				{
+					if (keepAlives [i].id != id)
+						continue;
 
-				latestPing = (int)stopwatch.ElapsedMilliseconds - keepAlives [i].time;
-				averagePing = (averagePing + latestPing) / 2;
+					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [i].time);
+					averagePing = (averagePing + latestPing) / 2;
 
-				break;
+					break;
+				}
 			}
 		}
 
@@ -365,6 +370,40 @@ namespace ClassDev.Networking.Transport
 				return null;
 
 			return channels [index];
+		}
+
+		/// <summary>
+		/// This method is called from a thread in the connection manager!
+		/// </summary>
+		public void Threaded_Update ()
+		{
+			if (isDisconnected)
+				return;
+
+			Message message = null;
+			do
+			{
+				message = DequeueFromSend ();
+				if (message != null)
+					messageManager.Send (message);
+			}
+			while (message != null);
+
+			if (!isSuccessful)
+			{
+				if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
+					return;
+
+				SendConnectionMessage ();
+				currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
+				return;
+			}
+
+			if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
+				return;
+
+			SendKeepAliveMessage ();
+			currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
 		}
 	}
 }

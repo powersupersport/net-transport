@@ -134,20 +134,26 @@ namespace ClassDev.Networking.Transport
 		{
 			Receive ();
 		}
-
-		[Obsolete]
+		
 		/// <summary>
 		/// Receives a message from the queue.
 		/// </summary>
 		/// <returns></returns>
 		public Message Receive ()
 		{
+			Message message = connectionManager.Receive ();
+			if (message != null)
+			{
+				messageHandler.Handle (message);
+				return message;
+			}
+
 			LowLevel.Message lowLevelMessage = messageManager.Receive ();
 
 			if (lowLevelMessage == null)
 				return null;
 
-			Message message = new Message (lowLevelMessage);
+			message = new Message (lowLevelMessage);
 
 			message.connection = connectionManager.ResolveConnection (message.endPoint);
 			if (message.connection != null)
@@ -161,10 +167,8 @@ namespace ClassDev.Networking.Transport
 				message = message.connection.DequeueFromReceive ();
 			}
 
-			if (message == null)
-				return null;
-
-			messageHandler.Handle (message);
+			if (message != null)
+				messageHandler.Handle (message);
 
 			return message;
 		}

@@ -5,15 +5,15 @@ namespace ClassDev.Networking.Transport
 {
 	public class ReliableMessageChannel : MessageChannel
 	{
-		public const int ReliableResend = 100;
+		public const int ReliableResend = 500;
 
 		class ReliableCopy
 		{
 			public int sequenceIndex;
-			public int time;
+			public long time;
 			public Message message;
 
-			public ReliableCopy (Message message, int sequenceIndex, int time)
+			public ReliableCopy (Message message, int sequenceIndex, long time)
 			{
 				this.message = message;
 				this.sequenceIndex = sequenceIndex;
@@ -84,10 +84,10 @@ namespace ClassDev.Networking.Transport
 			{
 				for (int i = 0; i < sentReliableCopies.Count; i++)
 				{
-					if ((int)stopwatch.ElapsedMilliseconds - sentReliableCopies [i].time < ReliableResend)
+					if (stopwatch.ElapsedMilliseconds - sentReliableCopies [i].time < ReliableResend)
 						continue;
 
-					sentReliableCopies [i].time = (int)stopwatch.ElapsedMilliseconds;
+					sentReliableCopies [i].time = stopwatch.ElapsedMilliseconds;
 					message = sentReliableCopies [i].message;
 					break;
 				}
@@ -101,7 +101,12 @@ namespace ClassDev.Networking.Transport
 
 			message = sendQueue.Dequeue ();
 			EncodeSequenceIndexInMessage (message);
-			sentReliableCopies.Add (new ReliableCopy (message, sendSequenceIndex, (int)stopwatch.ElapsedMilliseconds));
+
+			lock (sentReliableCopiesLock)
+			{
+				sentReliableCopies.Add (new ReliableCopy (message, sendSequenceIndex, stopwatch.ElapsedMilliseconds));
+			}
+
 			sendSequenceIndex += 1;
 
 			return message;
@@ -218,7 +223,7 @@ namespace ClassDev.Networking.Transport
 			Message message = new Message (connection, acknowledgementHandler, 0, 7);
 			message.encoder.Encode (id);
 			message.encoder.Encode (sequenceIndex);
-			messageManager.Send (message);
+			EnqueueToSend (message);
 		}
 
 		/// <summary>

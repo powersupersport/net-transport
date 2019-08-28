@@ -4,7 +4,7 @@ namespace ClassDev.Networking.Transport
 {
 	public class MessageChannel
 	{
-		public const int UnreliableDropTimeout = 200;
+		public const int UnreliableDropTimeout = 500;
 
 		/// <summary>
 		/// The channel ID relative to the connection.
@@ -96,7 +96,6 @@ namespace ClassDev.Networking.Transport
 		public virtual Message DequeueFromSend ()
 		{
 			Message message = null;
-
 			do
 			{
 				if (sendQueue.Count <= 0)

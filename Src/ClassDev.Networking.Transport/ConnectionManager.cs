@@ -22,10 +22,15 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private MessageChannelTemplate [] channelTemplates = null;
 
+		// TODO: MUST NOT BE PUBLIC ! ! !
 		/// <summary>
 		/// 
 		/// </summary>
 		public Connection [] connections = null;
+		/// <summary>
+		/// Thread lock for the connections.
+		/// </summary>
+		private readonly object connectionsLock = new object ();
 
 		/// <summary>
 		/// 
@@ -126,6 +131,10 @@ namespace ClassDev.Networking.Transport
 			if (endPoint == null)
 				throw new System.ArgumentNullException ("endPoint", "You cannot connect to a null ip end point...");
 
+			Connection connection = ResolveConnection (endPoint);
+			if (connection != null)
+				return connection;
+
 			if (channelTemplates == null)
 				channelTemplates = this.channelTemplates;
 
@@ -133,8 +142,12 @@ namespace ClassDev.Networking.Transport
 			if (index < 0)
 				throw new System.Exception ("Connection limit reached!");
 
-			Connection connection = new Connection (this, channelTemplates, endPoint, index);
-			connections [index] = connection;
+			connection = new Connection (this, channelTemplates, endPoint, index);
+
+			lock (connectionsLock)
+			{
+				connections [index] = connection;
+			}
 
 			return connection;
 		}
@@ -152,20 +165,44 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		/// <param name="endPoint"></param>
+		/// <param name="disconnected"></param>
 		/// <returns></returns>
-		public Connection ResolveConnection (IPEndPoint endPoint)
+		public Connection ResolveConnection (IPEndPoint endPoint, bool disconnected = false)
 		{
-			// TODO: Optimize...
-			for (int i = 0; i < connections.Length; i++)
+			lock (connectionsLock)
 			{
-				if (connections [i] == null)
-					continue;
+				// TODO: Optimize...
+				for (int i = 0; i < connections.Length; i++)
+				{
+					if (connections [i] == null)
+						continue;
 
-				if (connections [i].isDisconnected)
-					continue;
+					if (!disconnected && connections [i].isDisconnected)
+						continue;
 
-				if (Equals (connections [i].endPoint, endPoint))
-					return connections [i];
+					if (Equals (connections [i].endPoint, endPoint))
+						return connections [i];
+				}
+
+				return null;
+			}
+		}
+
+		public Message Receive ()
+		{
+			Message message = null;
+			lock (connectionsLock)
+			{
+				// TODO: Currently prioritizes the first connection. Should be circular.
+				for (int i = 0; i < connections.Length; i++)
+				{
+					if (connections [i] == null || connections [i].isDisconnected)
+						continue;
+
+					message = connections [i].DequeueFromReceive ();
+					if (message != null)
+						return message;
+				}
 			}
 
 			return null;
@@ -177,13 +214,16 @@ namespace ClassDev.Networking.Transport
 		/// <returns></returns>
 		private int GetFreeConnectionIndex ()
 		{
-			for (int i = 0; i < connections.Length; i++)
+			lock (connectionsLock)
 			{
-				if (connections [i] == null)
-					return i;
-			}
+				for (int i = 0; i < connections.Length; i++)
+				{
+					if (connections [i] == null)
+						return i;
+				}
 
-			return -1;
+				return -1;
+			}
 		}
 
 		/// <summary>
@@ -191,7 +231,10 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private void SetupConnections ()
 		{
-			connections = new Connection [maxConnections];
+			lock (connectionsLock)
+			{
+				connections = new Connection [maxConnections];
+			}
 		}
 
 		/// <summary>
@@ -199,15 +242,18 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private void DisposeConnections ()
 		{
-			for (int i = 0; i < maxConnections; i++)
+			lock (connectionsLock)
 			{
-				if (connections [i] == null)
-					continue;
+				for (int i = 0; i < maxConnections; i++)
+				{
+					if (connections [i] == null)
+						continue;
 
-				connections [i].Disconnect ();
+					connections [i].Disconnect ();
+				}
+
+				connections = null;
 			}
-
-			connections = null;
 		}
 
 		/// <summary>
@@ -216,20 +262,35 @@ namespace ClassDev.Networking.Transport
 		private void Threaded_UpdateConnections ()
 		{
 			int i = 0;
+			Connection connection = null;
 
 			while (true)
 			{
 				if (!isStarted)
 					return;
 
-				// TODO: Might need a lock...
-
 				for (i = 0; i < maxConnections; i++)
 				{
-					if (connections [i] == null)
+					lock (connectionsLock)
+					{
+						// In case the connections object gets unreferenced in another thread while it's unlocked.
+						if (connections == null)
+							break;
+
+						connection = connections [i];
+					}
+
+					if (connection == null)
 						continue;
 
-					connections [i].Update ();
+					// TODO: Add a constant for the timeout (2000).
+					if (connection.isDisconnected && stopwatch.ElapsedMilliseconds - connection.disconnectionTime > 2000)
+					{
+						connection = null;
+						return;
+					}
+
+					connection.Threaded_Update ();
 				}
 			}
 		}
@@ -299,7 +360,7 @@ namespace ClassDev.Networking.Transport
 			Message newMessage = new Message (message.connection, messageHandler.keepAliveHandler, 0, 10);
 			newMessage.encoder.Encode (id);
 			newMessage.encoder.Encode (true);
-			messageManager.Send (newMessage);
+			message.connection.EnqueueToSend (newMessage);
 		}
 
 		/// <summary>
@@ -312,7 +373,6 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			message.connection.Disconnect ();
-			connections [message.connection.id] = null;
 		}
 
 		/// <summary>

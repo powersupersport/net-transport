@@ -12,7 +12,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// The network time in milliseconds when the message has been created.
 		/// </summary>
-		public int time { get; private set; }
+		public long time { get; private set; }
 
 		/// <summary>
 		/// The channel used to send/receive this message.
@@ -75,7 +75,11 @@ namespace ClassDev.Networking.Transport
 			}
 		}
 
-		public void SetTime (int time)
+		/// <summary>
+		/// Set the message timestamp.
+		/// </summary>
+		/// <param name="time"></param>
+		public void SetTime (long time)
 		{
 			this.time = time;
 		}
