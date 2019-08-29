@@ -106,6 +106,9 @@ namespace ClassDev.Networking.Transport.LowLevel
 		/// <param name="message"></param>
 		public void Send (Message message)
 		{
+			if (!isStarted)
+				throw new InvalidOperationException ("The message manager has been stopped and therefore you cannot send messages. Create a new message manager instead.");
+
 			if (message == null)
 				throw new ArgumentNullException ("message", "The provided message to send is null.");
 
@@ -120,6 +123,9 @@ namespace ClassDev.Networking.Transport.LowLevel
 		/// </summary>
 		public Message Receive ()
 		{
+			if (!isStarted)
+				throw new InvalidOperationException ("The message manager has been stopped and therefore you cannot receive messages. Create a new message manager instead.");
+
 			lock (receiveQueueLock)
 			{
 				if (receiveQueue.Count <= 0)
