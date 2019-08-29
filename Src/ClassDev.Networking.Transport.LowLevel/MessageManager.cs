@@ -25,19 +25,13 @@ namespace ClassDev.Networking.Transport.LowLevel
 		/// </summary>
 		public MessageManager (UdpClient udpClient)
 		{
-			this.udpClient = udpClient;
-		}
-
-		/// <summary>
-		/// Starts the message manager.
-		/// </summary>
-		public void Start ()
-		{
-			if (isStarted)
-				return;
-
 			if (udpClient == null)
-				throw new Exception ("Message manager cannot be started if the UdpClient is null.");
+				throw new ArgumentNullException ("udpClient", "Message manager cannot be started if the UdpClient is null.");
+
+			this.udpClient = udpClient;
+
+			// TODO: Has to be changeable from the settings.
+			udpClient.Client.ReceiveTimeout = 50;
 
 			isStarted = true;
 
@@ -49,7 +43,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 		}
 
 		/// <summary>
-		/// Stops the message manager.
+		/// Stops the message manager. Call this to safely close the application.
 		/// </summary>
 		public void Stop ()
 		{
@@ -160,7 +154,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 						message = sendQueue.Dequeue ();
 					}
 
-					UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
+					//UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
 
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
@@ -186,7 +180,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 					messageContent = udpClient.Receive (ref endPoint);
 					message = new Message (endPoint, messageContent);
 
-					UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
+					//UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
 
 					lock (receiveQueueLock)
 					{

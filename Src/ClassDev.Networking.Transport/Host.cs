@@ -191,9 +191,6 @@ namespace ClassDev.Networking.Transport
 			udpClient = new UdpClient (endPoint);
 
 			endPoint.Port = ((IPEndPoint)udpClient.Client.LocalEndPoint).Port;
-
-			// TODO: Has to be changeable from the settings.
-			udpClient.Client.ReceiveTimeout = 50;
 		}
 
 		/// <summary>
@@ -221,7 +218,6 @@ namespace ClassDev.Networking.Transport
 				throw new Exception ("Cannot set up message manager if the UdpClient is null.");
 
 			messageManager = new MessageManager (udpClient);
-			messageManager.Start ();
 		}
 
 		/// <summary>
