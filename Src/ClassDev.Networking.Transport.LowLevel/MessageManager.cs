@@ -117,7 +117,6 @@ namespace ClassDev.Networking.Transport.LowLevel
 
 			lock (sendQueueLock)
 			{
-				//UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
 				sendQueue.Enqueue (message);
 			}
 		}
@@ -161,6 +160,8 @@ namespace ClassDev.Networking.Transport.LowLevel
 						message = sendQueue.Dequeue ();
 					}
 
+					UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
+
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
 			}
@@ -185,7 +186,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 					messageContent = udpClient.Receive (ref endPoint);
 					message = new Message (endPoint, messageContent);
 
-					//UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
+					UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
 
 					lock (receiveQueueLock)
 					{

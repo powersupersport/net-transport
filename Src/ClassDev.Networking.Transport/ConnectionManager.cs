@@ -105,7 +105,7 @@ namespace ClassDev.Networking.Transport
 		/// <param name="port">The port of the remote host.</param>
 		/// <param name="timeout">For how long the connection attempt will last (in seconds).</param>
 		/// <returns>Data about the current state of the connection attempt.</returns>
-		public Connection Connect (string ipAddress, int port, float timeout = Connection.Timeout, MessageChannelTemplate [] channelTemplates = null)
+		public Connection Connect (string ipAddress, int port, float timeout = Connection.ConnectTimeout, MessageChannelTemplate [] channelTemplates = null)
 		{
 			if (!isStarted)
 				return null;
@@ -123,7 +123,7 @@ namespace ClassDev.Networking.Transport
 		/// <param name="endPoint">The remote end point to connect to.</param>
 		/// <param name="timeout">For how long the connection attempt will last (in seconds).</param>
 		/// <returns>Data about the current state of the connection attempt.</returns>
-		public Connection Connect (IPEndPoint endPoint, float timeout = Connection.Timeout, MessageChannelTemplate [] channelTemplates = null)
+		public Connection Connect (IPEndPoint endPoint, float timeout = Connection.ConnectTimeout, MessageChannelTemplate [] channelTemplates = null)
 		{
 			if (!isStarted)
 				return null;
@@ -290,7 +290,14 @@ namespace ClassDev.Networking.Transport
 						return;
 					}
 
-					connection.Threaded_Update ();
+					try
+					{
+						connection.Threaded_Update ();
+					}
+					catch (TimeoutException)
+					{
+						connection.Disconnect ();
+					}
 				}
 			}
 		}

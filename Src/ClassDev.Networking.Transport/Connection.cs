@@ -10,7 +10,11 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		public const int Timeout = 10000;
+		public const int ConnectTimeout = 10000;
+		/// <summary>
+		/// 
+		/// </summary>
+		public const int DisconnectTimeout = 2500;
 		/// <summary>
 		/// 
 		/// </summary>
@@ -85,7 +89,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private CircularArray<KeepAlive> keepAlives = new CircularArray<KeepAlive> (50);
+		private CircularArray<KeepAlive> keepAlives = new CircularArray<KeepAlive> (10);
 		/// <summary>
 		/// Thread lock for keep alive records.
 		/// </summary>
@@ -99,6 +103,11 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		private int currentKeepAliveTime = 0;
+
+		/// <summary>
+		/// 
+		/// </summary>
+		private long latestPacketReceivedTime = 0;
 
 		/// <summary>
 		/// 
@@ -176,6 +185,8 @@ namespace ClassDev.Networking.Transport
 			isDisconnected = true;
 			disconnectionTime = stopwatch.ElapsedMilliseconds;
 
+			UnityEngine.Debug.Log ("Disconnected!");
+
 			for (int i = 0; i < 3; i++)
 			{
 				SendDisconnectionMessage ();
@@ -199,6 +210,7 @@ namespace ClassDev.Networking.Transport
 			}
 
 			message.SetTime (stopwatch.ElapsedMilliseconds);
+			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
 
 			lock (sendChannelLock)
 			{
@@ -220,11 +232,11 @@ namespace ClassDev.Networking.Transport
 			lock (sendChannelLock)
 			{
 				message = channels [currentSendChannelIndex].DequeueFromSend ();
-			}
-			currentSendChannelIndex += 1;
+				currentSendChannelIndex += 1;
 
-			if (currentSendChannelIndex >= channels.Length)
-				currentSendChannelIndex = 0;
+				if (currentSendChannelIndex >= channels.Length)
+					currentSendChannelIndex = 0;
+			}
 
 			if (message != null)
 				return message;
@@ -269,11 +281,11 @@ namespace ClassDev.Networking.Transport
 			lock (receiveChannelLock)
 			{
 				message = channels [currentReceiveChannelIndex].DequeueFromReceive ();
-			}
-			currentReceiveChannelIndex += 1;
+				currentReceiveChannelIndex += 1;
 
-			if (currentReceiveChannelIndex >= channels.Length)
-				currentReceiveChannelIndex = 0;
+				if (currentReceiveChannelIndex >= channels.Length)
+					currentReceiveChannelIndex = 0;
+			}
 
 			if (message != null)
 				return message;
@@ -344,6 +356,8 @@ namespace ClassDev.Networking.Transport
 					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [i].time);
 					averagePing = (averagePing + latestPing) / 2;
 
+					latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
+
 					break;
 				}
 			}
@@ -398,6 +412,9 @@ namespace ClassDev.Networking.Transport
 				currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
 				return;
 			}
+
+			if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTime > DisconnectTimeout)
+				throw new TimeoutException ("No packets received for too long.");
 
 			if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
 				return;

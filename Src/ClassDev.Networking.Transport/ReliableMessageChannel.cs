@@ -78,12 +78,13 @@ namespace ClassDev.Networking.Transport
 		{
 			Message message = null;
 
-			// TODO: Reliable unsequenced there is a problem, another thread modifies sent reliable copies.
-
 			lock (sentReliableCopiesLock)
 			{
 				for (int i = 0; i < sentReliableCopies.Count; i++)
 				{
+					if (stopwatch.ElapsedMilliseconds - sentReliableCopies [i].message.time > Connection.DisconnectTimeout)
+						throw new TimeoutException ("A reliable message took too long to acknowledge.");
+
 					if (stopwatch.ElapsedMilliseconds - sentReliableCopies [i].time < ReliableResend)
 						continue;
 
@@ -137,11 +138,8 @@ namespace ClassDev.Networking.Transport
 
 			if (sequenceIndex <= receiveSequenceIndex - 64)
 			{
-				// TODO: Throw a timeout exception.
-				return;
+				throw new TimeoutException ("Too old packets received on a reliable unsequenced channel!");
 			}
-
-			// TODO: Disconnect on so many overflows.
 
 			if (sequenceIndex - receiveSequenceIndex >= 128)
 			{
@@ -223,7 +221,7 @@ namespace ClassDev.Networking.Transport
 			Message message = new Message (connection, acknowledgementHandler, 0, 7);
 			message.encoder.Encode (id);
 			message.encoder.Encode (sequenceIndex);
-			EnqueueToSend (message);
+			connection.EnqueueToSend (message);
 		}
 
 		/// <summary>
