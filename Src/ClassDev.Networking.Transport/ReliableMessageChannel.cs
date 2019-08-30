@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace ClassDev.Networking.Transport
@@ -20,6 +20,7 @@ namespace ClassDev.Networking.Transport
 				this.time = time;
 			}
 		}
+		// TODO: Put a hard limit on how many messages can the list have buffered.
 		/// <summary>
 		/// 
 		/// </summary>
@@ -28,6 +29,7 @@ namespace ClassDev.Networking.Transport
 		/// 
 		/// </summary>
 		private readonly object sentReliableCopiesLock = new object ();
+		// TODO: If overloaded, should disconnect immediately.
 		/// <summary>
 		/// 
 		/// </summary>
@@ -136,6 +138,7 @@ namespace ClassDev.Networking.Transport
 				return;
 			}
 
+			// TODO: Fix to 128
 			if (sequenceIndex <= receiveSequenceIndex - 64)
 			{
 				throw new TimeoutException ("Too old packets received on a reliable unsequenced channel!");
