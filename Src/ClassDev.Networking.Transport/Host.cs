@@ -118,13 +118,12 @@ namespace ClassDev.Networking.Transport
 		public void Send (Message message)
 		{
 			if (message == null)
-				// TODO: Throw an exception.
-				return;
+				throw new ArgumentNullException ("message", "The specified message to send is null.");
 
 			if (message.connection != null)
 				message.connection.EnqueueToSend (message);
 
-			// TODO: What if there is no connection?
+			messageManager.Send (message);
 		}
 
 		/// <summary>

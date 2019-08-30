@@ -278,24 +278,25 @@ namespace ClassDev.Networking.Transport
 							break;
 
 						connection = connections [i];
-					}
 
-					if (connection == null)
-						continue;
+						if (connection == null)
+							continue;
 
-					// TODO: Add a constant for the timeout (2000).
-					if (connection.isDisconnected && stopwatch.ElapsedMilliseconds - connection.disconnectionTime > 2000)
-					{
-						connection = null;
-						return;
+						// TODO: Add a constant for the timeout (2000).
+						if (connection.isDisconnected && stopwatch.ElapsedMilliseconds - connection.disconnectionTime > 2000)
+						{
+							connections [i] = null;
+							continue;
+						}
 					}
 
 					try
 					{
 						connection.Threaded_Update ();
 					}
-					catch (TimeoutException)
+					catch (TimeoutException e)
 					{
+						UnityEngine.Debug.LogError (e.Message);
 						connection.Disconnect ();
 					}
 				}

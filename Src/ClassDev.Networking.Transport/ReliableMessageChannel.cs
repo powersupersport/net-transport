@@ -5,7 +5,9 @@ namespace ClassDev.Networking.Transport
 {
 	public class ReliableMessageChannel : MessageChannel
 	{
-		public const int ReliableResend = 500;
+		public const int ReliableResend = 300;
+
+		public const int MaxQueuedMessages = 128;
 
 		class ReliableCopy
 		{
@@ -20,7 +22,6 @@ namespace ClassDev.Networking.Transport
 				this.time = time;
 			}
 		}
-		// TODO: Put a hard limit on how many messages can the list have buffered.
 		/// <summary>
 		/// 
 		/// </summary>
@@ -82,6 +83,9 @@ namespace ClassDev.Networking.Transport
 
 			lock (sentReliableCopiesLock)
 			{
+				if (sentReliableCopies.Count > MaxQueuedMessages)
+					throw new TimeoutException ("Reliable buffer was overloaded.");
+
 				for (int i = 0; i < sentReliableCopies.Count; i++)
 				{
 					if (stopwatch.ElapsedMilliseconds - sentReliableCopies [i].message.time > Connection.DisconnectTimeout)
@@ -138,20 +142,19 @@ namespace ClassDev.Networking.Transport
 				return;
 			}
 
-			// TODO: Fix to 128
-			if (sequenceIndex <= receiveSequenceIndex - 64)
+			if (sequenceIndex <= receiveSequenceIndex - MaxQueuedMessages)
 			{
 				throw new TimeoutException ("Too old packets received on a reliable unsequenced channel!");
 			}
 
-			if (sequenceIndex - receiveSequenceIndex >= 128)
+			if (sequenceIndex - receiveSequenceIndex >= MaxQueuedMessages)
 			{
-				receiveSequenceIndex += 128;
+				receiveSequenceIndex += MaxQueuedMessages;
 			}
 
 			// TODO: Check if the queue is overloaded.
 
-			if (receivedReliableCopies [sequenceIndex] == null || receivedReliableCopies [sequenceIndex].sequenceIndex < sequenceIndex - 127)
+			if (receivedReliableCopies [sequenceIndex] == null || receivedReliableCopies [sequenceIndex].sequenceIndex < sequenceIndex - MaxQueuedMessages)
 			{
 				if (isSequenced)
 				{

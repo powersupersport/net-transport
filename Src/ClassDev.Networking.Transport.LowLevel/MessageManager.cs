@@ -31,7 +31,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 			this.udpClient = udpClient;
 
 			// TODO: Has to be changeable from the settings.
-			udpClient.Client.ReceiveTimeout = 50;
+			udpClient.Client.ReceiveTimeout = 10;
 
 			isStarted = true;
 
@@ -131,11 +131,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 				if (receiveQueue.Count <= 0)
 					return null;
 
-				//if (UnityEngine.Random.Range (0, 100) > 50)
-				//{
-				//	receiveQueue.Dequeue ();
-				//	return null;
-				//}
+				if (UnityEngine.Random.Range (0, 100) < 0)
+				{
+					receiveQueue.Dequeue ();
+					return null;
+				}
 
 				return receiveQueue.Dequeue ();
 			}

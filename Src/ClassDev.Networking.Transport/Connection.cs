@@ -14,7 +14,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		public const int DisconnectTimeout = 2500;
+		public const int DisconnectTimeout = 3000;
 		/// <summary>
 		/// 
 		/// </summary>
@@ -102,7 +102,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
-		private int currentKeepAliveTime = 0;
+		private long currentKeepAliveTime = 0;
 
 		/// <summary>
 		/// 
@@ -156,6 +156,7 @@ namespace ClassDev.Networking.Transport
 			acknowledgementHandler = connectionManager.messageHandler.acknowledgementHandler;
 
 			stopwatch = connectionManager.stopwatch;
+			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
 
 			if (channelTemplates == null)
 				channelTemplates = new MessageChannelTemplate [0];
@@ -210,7 +211,6 @@ namespace ClassDev.Networking.Transport
 			}
 
 			message.SetTime (stopwatch.ElapsedMilliseconds);
-			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
 
 			lock (sendChannelLock)
 			{
@@ -261,6 +261,8 @@ namespace ClassDev.Networking.Transport
 			}
 
 			message.SetTime (stopwatch.ElapsedMilliseconds);
+			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
+
 			lock (receiveChannelLock)
 			{
 				message.channel.EnqueueToReceive (message);
@@ -317,8 +319,6 @@ namespace ClassDev.Networking.Transport
 			message.encoder.Encode (currentKeepAliveId);
 			message.encoder.Encode (false);
 
-			EnqueueToSend (message);
-
 			KeepAlive keepAlive = new KeepAlive ();
 			keepAlive.id = currentKeepAliveId;
 			keepAlive.time = stopwatch.ElapsedMilliseconds;
@@ -330,6 +330,8 @@ namespace ClassDev.Networking.Transport
 
 			// TODO: Once overloaded, it should wrap around
 			currentKeepAliveId += 1;
+
+			EnqueueToSend (message);
 		}
 
 		/// <summary>
@@ -405,11 +407,15 @@ namespace ClassDev.Networking.Transport
 
 			if (!isSuccessful)
 			{
-				if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
+				if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTime > ConnectTimeout)
+					throw new TimeoutException ("Failed to connect to " + endPoint.ToString ());
+
+				if (stopwatch.ElapsedMilliseconds - currentKeepAliveTime < Frequency)
 					return;
 
 				SendConnectionMessage ();
-				currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
+				currentKeepAliveTime = stopwatch.ElapsedMilliseconds;
+
 				return;
 			}
 
