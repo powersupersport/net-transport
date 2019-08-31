@@ -18,6 +18,7 @@ Constructor for the MessageManager object.
 
 ### ```MessageManager.isStarted```
 ```bool isStarted```
+
 True if the message manager is working. False if stopped.
 
 
@@ -55,6 +56,4 @@ Used to receive a message from the queue.
 
 - Returns:
 	- ```Message``` - A message object with the received message inside. Visit the ```Message``` class for more info.
-	- ```null``` - If there are no messages in the queue 
-
-Returns a message object with the message inside, or null if there are no messages in the receive queue.
+	- ```null``` - If there are no messages in the queue.
