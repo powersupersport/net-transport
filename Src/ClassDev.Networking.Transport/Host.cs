@@ -16,7 +16,7 @@ namespace ClassDev.Networking.Transport
 		public bool isStarted { get; private set; }
 
 		/// <summary>
-		/// The UDP client used for sending and receiving messages.
+		/// [CAUTION] The heart, the core, the client used for sending and receiving messages. Use ONLY if you cannot utilize the MessageManager included in this class.
 		/// </summary>
 		public UdpClient udpClient { get; private set; }
 		/// <summary>
@@ -24,11 +24,11 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public IPEndPoint endPoint { get; private set; }
 		/// <summary>
-		/// The message manager used for managing sending and receiving messages.
+		/// The message manager used for managing sending and receiving messages. Use only if no methods in this class fit your needs.
 		/// </summary>
 		public MessageManager messageManager { get; private set; }
 		/// <summary>
-		/// The connection manager used for managing connections.
+		/// The connection manager used for managing connections. Use only if no methods in this class fit your needs.
 		/// </summary>
 		public ConnectionManager connectionManager { get; private set; }
 		/// <summary>
@@ -38,7 +38,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// A struct for the result of a resolved handler used in async handler resolving.
 		/// </summary>
-		struct ReceivedMessage
+		private struct ReceivedMessage
 		{
 			public Message message;
 			public MessageHandler.Callback callback;
@@ -186,7 +186,6 @@ namespace ClassDev.Networking.Transport
 
 			return connectionManager.Connect (ipAddress, port, timeout, messageChannelTemplates);
 		}
-
 		/// <summary>
 		/// Connect to a host using an IPEndPoint.
 		/// </summary>
@@ -215,6 +214,29 @@ namespace ClassDev.Networking.Transport
 				throw new NullReferenceException ("The connection you want to disconnect is null.");
 
 			connectionManager.Disconnect (connection);
+		}
+
+		/// <summary>
+		/// Resolves a connection by an IP address and a port.
+		/// </summary>
+		/// <param name="ipAddress"></param>
+		/// <param name="port"></param>
+		/// <returns></returns>
+		public Connection ResolveConnection (string ipAddress, int port)
+		{
+			IPAddress ipAddressParsed = IPAddress.Parse (ipAddress);
+			IPEndPoint endPoint = new IPEndPoint (ipAddressParsed, port);
+
+			return ResolveConnection (endPoint);
+		}
+		/// <summary>
+		/// Resolves a connection by an IPEndPoint.
+		/// </summary>
+		/// <param name="endPoint"></param>
+		/// <returns></returns>
+		public Connection ResolveConnection (IPEndPoint endPoint)
+		{
+			return connectionManager.ResolveConnection (endPoint);
 		}
 
 		// ---------------------------------------------------------------------------

@@ -303,7 +303,7 @@ namespace ClassDev.Networking.Transport
 			if (isDisconnected)
 				return;
 
-			Message message = new Message (this, connectionHandler, 0, 10);
+			Message message = new Message (this, connectionHandler, 0, 0);
 			EnqueueToSend (message);
 		}
 
