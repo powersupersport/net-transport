@@ -24,7 +24,7 @@
 		if (index == 0)
 			return CurrentIndex;
 
-		index = CurrentIndex + index;
+		index += CurrentIndex;
 		index = index % Length;
 
 		if (index < 0)

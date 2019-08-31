@@ -10,10 +10,18 @@ namespace ClassDev.Networking.Transport.LowLevel
 	{
 		#region Setup
 
+		// TODO: Add statistics
+
+		// TODO: Add a hard limit on the queues, or drop messages on overload.
+
 		/// <summary>
 		/// The UDP client used for sending and receiving. This is assigned from the constructor.
 		/// </summary>
 		private UdpClient udpClient;
+		/// <summary>
+		/// Lock for the udp client.
+		/// </summary>
+		private readonly object udpClientLock = new object ();
 
 		/// <summary>
 		/// True if the message manager is running.
@@ -131,11 +139,11 @@ namespace ClassDev.Networking.Transport.LowLevel
 				if (receiveQueue.Count <= 0)
 					return null;
 
-				if (UnityEngine.Random.Range (0, 100) < 0)
-				{
-					receiveQueue.Dequeue ();
-					return null;
-				}
+				//if (UnityEngine.Random.Range (0, 100) < 0)
+				//{
+				//	receiveQueue.Dequeue ();
+				//	return null;
+				//}
 
 				return receiveQueue.Dequeue ();
 			}
@@ -160,8 +168,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 						message = sendQueue.Dequeue ();
 					}
 
-					//UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
-
+					UnityEngine.Debug.LogAssertion ("Sent: " + message.ToString ());
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
 			}
@@ -173,7 +180,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 		private void Threaded_ReceiveMessages ()
 		{
 			Message message = null;
-			IPEndPoint endPoint = new IPEndPoint (IPAddress.Any, 0);
+			IPEndPoint endPoint = new IPEndPoint (IPAddress.None, 0);
 			byte [] messageContent = null;
 
 			while (true)
@@ -186,8 +193,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 					messageContent = udpClient.Receive (ref endPoint);
 					message = new Message (endPoint, messageContent);
 
-					//UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
-
+					UnityEngine.Debug.LogAssertion ("Received: " + message.ToString ());
 					lock (receiveQueueLock)
 					{
 						receiveQueue.Enqueue (message);
@@ -195,7 +201,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 				}
 				catch (SocketException)
 				{
-					
+
 				}
 			}
 		}

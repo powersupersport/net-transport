@@ -7,16 +7,16 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// The local id of the handler. This id is local to the subgroup.
 		/// </summary>
-		public byte id = 0;
+		public byte id { get; private set; }
 		/// <summary>
 		/// How deep the handler is (to how many subgroups does it belong).
 		/// </summary>
-		public byte depth = 0;
+		public byte depth { get; private set; }
 
 		/// <summary>
 		/// The reference path to this message handler by ids.
 		/// </summary>
-		public byte [] signature = null;
+		public byte [] signature { get; private set; }
 
 		/// <summary>
 		/// The handler callback definition.
@@ -27,11 +27,11 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Optimized handlers.
 		/// </summary>
-		private MessageHandler [] optimizedHandlers;
+		private MessageHandler [] optimizedHandlers = null;
 		/// <summary>
 		/// Unoptimized handlers.
 		/// </summary>
-		private List<MessageHandler> handlers;
+		private List<MessageHandler> handlers = null;
 
 		/// <summary>
 		/// The handler (group) which this handler belongs to.
@@ -79,33 +79,32 @@ namespace ClassDev.Networking.Transport
 		public MessageHandler Register (Callback callback)
 		{
 			if (this.callback != null)
-				throw new System.InvalidOperationException ("Trying to register a handler in a handler that is not a group. You can only register handlers in group handlers.");
+				throw new System.InvalidOperationException ("Trying to register a handler in a handler that is not a branch. You can only register handlers in branch handlers.");
+
+			if (handlers.Count >= 256)
+				throw new System.InvalidOperationException ("The message handler is full! You can only register up to 256 handlers in one branch. Create a branched handler and put the new handler inside.");
 
 			MessageHandler messageHandler = new MessageHandler (callback);
-
 			handlers.Add (messageHandler);
 
 			return messageHandler;
 		}
 
 		/// <summary>
-		/// Handles the message.
+		/// Resolves the handler of the message.
 		/// </summary>
 		/// <param name="message"></param>
-		public void Handle (Message message)
+		public MessageHandler ResolveHandler (Message message)
 		{
 			if (message == null)
-				return;
+				return null;
 
 			if (optimizedHandlers == null)
 			{
 				if (callback == null)
-					// TODO: Throw an exception.
-					return;
+					return null;
 
-				callback (message);
-
-				return;
+				return this;
 			}
 
 			byte id = 0;
@@ -116,50 +115,41 @@ namespace ClassDev.Networking.Transport
 			}
 			catch (System.Exception)
 			{
-				return;
+				return null;
 			}
 
 			if (id >= optimizedHandlers.Length)
-				// TODO: Throw an exception.
-				return;
+				return null;
 
 			if (optimizedHandlers [id] == null)
-				// TODO: Throw an exception.
-				return;
+				return null;
 
-			optimizedHandlers [id].Handle (message);
+			return optimizedHandlers [id].ResolveHandler (message);
 		}
 
 		/// <summary>
-		/// Optimizes the handler and makes it ready for handling messages. You must call this on the root message handler.
+		/// Optimizes the handler and all children handlers by caching all handler callbacks. You must call this on the root message handler.
 		/// </summary>
 		public void Optimize ()
 		{
-			if (parentHandler != null)
-				throw new System.InvalidOperationException ("Optimize should be called on the root handler. There are necessary dependencies that need to be calculated from the root handler.");
-
-			OptimizePrivate ();
+			OptimizePrivate (depth, this.signature);
 		}
 
 		/// <summary>
 		/// Recursive optimizer.
 		/// </summary>
 		/// <param name="depth"></param>
-		private void OptimizePrivate (int depth = 0)
+		/// <param name="signature"></param>
+		private void OptimizePrivate (int depth = 0, byte [] signature = null)
 		{
 			this.depth = (byte)depth;
 
-			signature = new byte [depth];
-			MessageHandler parentHandler = this.parentHandler;
-			for (int i = depth - 1; i >= 0; i--)
+			this.signature = new byte [depth];
+			for (int i = 0; i < signature.Length; i++)
 			{
-				signature [i] = id;
-
-				if (parentHandler == null)
-					break;
-
-				parentHandler = parentHandler.parentHandler;
+				this.signature [i] = signature [i];
 			}
+			signature [depth - 1] = id;
 
 			if (handlers == null)
 				return;
@@ -174,7 +164,7 @@ namespace ClassDev.Networking.Transport
 				optimizedHandlers [i] = handlers [i];
 				optimizedHandlers [i].id = (byte)i;
 
-				optimizedHandlers [i].OptimizePrivate (depth + 1);
+				optimizedHandlers [i].OptimizePrivate (depth + 1, this.signature);
 			}
 		}
 	}

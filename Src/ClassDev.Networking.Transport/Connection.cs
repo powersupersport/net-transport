@@ -316,15 +316,16 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			Message message = new Message (this, keepAliveHandler, 0, 10);
-			message.encoder.Encode (currentKeepAliveId);
-			message.encoder.Encode (false);
-
-			KeepAlive keepAlive = new KeepAlive ();
-			keepAlive.id = currentKeepAliveId;
-			keepAlive.time = stopwatch.ElapsedMilliseconds;
 
 			lock (keepAlivesLock)
 			{
+				message.encoder.Encode (currentKeepAliveId);
+				message.encoder.Encode (false);
+
+				KeepAlive keepAlive = new KeepAlive ();
+				keepAlive.id = currentKeepAliveId;
+				keepAlive.time = stopwatch.ElapsedMilliseconds;
+
 				keepAlives.Push (keepAlive);
 			}
 
@@ -346,16 +347,14 @@ namespace ClassDev.Networking.Transport
 			if (!isSuccessful)
 				isSuccessful = true;
 
-			// TODO: Ping calculation seems to stop if the message buffers are overloaded.
-
 			lock (keepAlivesLock)
 			{
 				for (int i = 0; i < keepAlives.Length; i++)
 				{
-					if (keepAlives [i].id != id)
+					if (keepAlives [-i].id != id)
 						continue;
 
-					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [i].time);
+					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [-i].time);
 					averagePing = (averagePing + latestPing) / 2;
 
 					latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
@@ -397,13 +396,9 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			Message message = null;
-			do
-			{
-				message = DequeueFromSend ();
-				if (message != null)
-					messageManager.Send (message);
-			}
-			while (message != null);
+			message = DequeueFromSend ();
+			if (message != null)
+				messageManager.Send (message);
 
 			if (!isSuccessful)
 			{

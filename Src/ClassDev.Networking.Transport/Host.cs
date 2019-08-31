@@ -3,6 +3,8 @@ using System.Net.Sockets;
 using System.Net;
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace ClassDev.Networking.Transport
 {
@@ -33,6 +35,37 @@ namespace ClassDev.Networking.Transport
 		/// The message handler used to handle messages.
 		/// </summary>
 		public BaseHandler messageHandler { get; private set; }
+		/// <summary>
+		/// A struct for the result of a resolved handler used in async handler resolving.
+		/// </summary>
+		struct ReceivedMessage
+		{
+			public Message message;
+			public MessageHandler.Callback callback;
+
+			public ReceivedMessage (Message message, MessageHandler.Callback callback)
+			{
+				this.message = message;
+				this.callback = callback;
+			}
+
+			public void Handle ()
+			{
+				callback (message);
+			}
+		}
+		/// <summary>
+		/// Queue of messages with resolved handlers.
+		/// </summary>
+		Queue<ReceivedMessage> receivedMessages = new Queue<ReceivedMessage> ();
+		/// <summary>
+		/// Thread lock for the received messages.
+		/// </summary>
+		private readonly object receivedMessagesLock = new object ();
+		/// <summary>
+		/// Thread to run the resolving of incoming messages.
+		/// </summary>
+		private Thread receiveThread = null;
 
 		/// <summary>
 		/// Keeps track of time in milliseconds.
@@ -74,10 +107,8 @@ namespace ClassDev.Networking.Transport
 
 			isStarted = true;
 
-			stopwatch = new Stopwatch ();
-			stopwatch.Start ();
+			SetupStopwatch ();
 
-			// TODO: The message handler should be setup before starting the host.
 			SetupMessageHandler ();
 
 			SetupUdpClient ();
@@ -85,6 +116,8 @@ namespace ClassDev.Networking.Transport
 			SetupMessageManager ();
 
 			SetupConnectionManager ();
+
+			SetupReceiveThread ();
 		}
 
 		/// <summary>
@@ -97,22 +130,37 @@ namespace ClassDev.Networking.Transport
 
 			isStarted = false;
 
-			ShutdownMessageHandler ();
+			TeardownReceiveThread ();
 
-			ShutdownConnectionManager ();
+			TeardownMessageHandler ();
 
-			ShutdownMessageManager ();
+			TeardownConnectionManager ();
 
-			ShutdownUdpClient ();
+			TeardownMessageManager ();
 
-			stopwatch.Stop ();
-			stopwatch = null;
+			TeardownUdpClient ();
+
+			TeardownStopwatch ();
 
 			GC.Collect ();
 		}
 
 		/// <summary>
-		/// Sends a message from the queue.
+		/// Call this from a synchronous update loop in your app.
+		/// </summary>
+		public void Update ()
+		{
+			lock (receivedMessagesLock)
+			{
+				while (receivedMessages.Count > 0)
+				{
+					receivedMessages.Dequeue ().Handle ();
+				}
+			}
+		}
+
+		/// <summary>
+		/// Sends a message.
 		/// </summary>
 		/// <param name="message"></param>
 		public void Send (Message message)
@@ -120,61 +168,76 @@ namespace ClassDev.Networking.Transport
 			if (message == null)
 				throw new ArgumentNullException ("message", "The specified message to send is null.");
 
-			if (message.connection != null)
-				message.connection.EnqueueToSend (message);
-
-			messageManager.Send (message);
+			SendPrivate (message);
 		}
 
 		/// <summary>
-		/// A function to update the synchronous part of the code.
+		/// Connect to a host using an IP address and a port.
 		/// </summary>
-		public void Update ()
-		{
-			Receive ();
-		}
-		
-		/// <summary>
-		/// Receives a message from the queue.
-		/// </summary>
+		/// <param name="ipAddress"></param>
+		/// <param name="port"></param>
+		/// <param name="timeout"></param>
+		/// <param name="messageChannelTemplates"></param>
 		/// <returns></returns>
-		public Message Receive ()
+		public Connection Connect (string ipAddress, int port, float timeout = Connection.ConnectTimeout, MessageChannelTemplate [] messageChannelTemplates = null)
 		{
-			Message message = connectionManager.Receive ();
-			if (message != null)
-			{
-				messageHandler.Handle (message);
-				return message;
-			}
+			if (!isStarted)
+				throw new InvalidOperationException ("You cannot use Connect if the host isn't started.");
 
-			LowLevel.Message lowLevelMessage = messageManager.Receive ();
+			return connectionManager.Connect (ipAddress, port, timeout, messageChannelTemplates);
+		}
 
-			if (lowLevelMessage == null)
-				return null;
+		/// <summary>
+		/// Connect to a host using an IPEndPoint.
+		/// </summary>
+		/// <param name="endPoint"></param>
+		/// <param name="timeout"></param>
+		/// <param name="messageChannelTemplates"></param>
+		/// <returns></returns>
+		public Connection Connect (IPEndPoint endPoint, float timeout = Connection.ConnectTimeout, MessageChannelTemplate [] messageChannelTemplates = null)
+		{
+			if (!isStarted)
+				throw new InvalidOperationException ("You cannot use Connect if the host isn't started.");
 
-			message = new Message (lowLevelMessage);
+			return connectionManager.Connect (endPoint, timeout, messageChannelTemplates);
+		}
 
-			message.connection = connectionManager.ResolveConnection (message.endPoint);
-			if (message.connection != null)
-			{
-				// The message channel ID is assigned in the message itself.
-				message.channel = message.connection.GetMessageChannelByIndex (message.channelId);
-				if (message.channel == null)
-					return null;
+		/// <summary>
+		/// Disconnects a connection.
+		/// </summary>
+		/// <param name="connection"></param>
+		public void Disconnect (Connection connection)
+		{
+			if (!isStarted)
+				throw new InvalidOperationException ("You cannot use Disconnect if the host isn't started.");
 
-				message.connection.EnqueueToReceive (message);
-				message = message.connection.DequeueFromReceive ();
-			}
+			if (connection == null)
+				throw new NullReferenceException ("The connection you want to disconnect is null.");
 
-			if (message != null)
-				messageHandler.Handle (message);
-
-			return message;
+			connectionManager.Disconnect (connection);
 		}
 
 		// ---------------------------------------------------------------------------
 
 		#region Setup
+
+		/// <summary>
+		/// Starts the stopwatch.
+		/// </summary>
+		private void SetupStopwatch ()
+		{
+			stopwatch = new Stopwatch ();
+			stopwatch.Start ();
+		}
+
+		/// <summary>
+		/// Stops the stopwatch.
+		/// </summary>
+		private void TeardownStopwatch ()
+		{
+			stopwatch.Stop ();
+			stopwatch = null;
+		}
 
 		/// <summary>
 		/// Initializes the UDP client.
@@ -195,7 +258,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Closes the UDP client port and disposes the object.
 		/// </summary>
-		private void ShutdownUdpClient ()
+		private void TeardownUdpClient ()
 		{
 			if (udpClient == null)
 				return;
@@ -211,7 +274,7 @@ namespace ClassDev.Networking.Transport
 		private void SetupMessageManager ()
 		{
 			if (messageManager != null)
-				ShutdownMessageManager ();
+				TeardownMessageManager ();
 
 			if (udpClient == null)
 				throw new Exception ("Cannot set up message manager if the UdpClient is null.");
@@ -222,7 +285,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Stops the message manager and resets the variable.
 		/// </summary>
-		private void ShutdownMessageManager ()
+		private void TeardownMessageManager ()
 		{
 			if (messageManager == null)
 				return;
@@ -237,7 +300,7 @@ namespace ClassDev.Networking.Transport
 		private void SetupConnectionManager ()
 		{
 			if (connectionManager != null)
-				ShutdownConnectionManager ();
+				TeardownConnectionManager ();
 
 			if (messageManager == null)
 				throw new Exception ("Cannot set up connection manager if the message manager is null.");
@@ -249,7 +312,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Stops the connection manager and resets the variable.
 		/// </summary>
-		private void ShutdownConnectionManager ()
+		private void TeardownConnectionManager ()
 		{
 			if (connectionManager == null)
 				return;
@@ -273,9 +336,120 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Unreferences the message handler.
 		/// </summary>
-		private void ShutdownMessageHandler ()
+		private void TeardownMessageHandler ()
 		{
 			messageHandler = null;
+		}
+
+		/// <summary>
+		/// Starts the thread for receiving incoming messages.
+		/// </summary>
+		private void SetupReceiveThread ()
+		{
+			receiveThread = new Thread (Threaded_ReceiveMessages);
+			receiveThread.Start ();
+		}
+
+		/// <summary>
+		/// Stops the thread for receiving incoming messages.
+		/// </summary>
+		private void TeardownReceiveThread ()
+		{
+			receiveThread.Join ();
+			receiveThread = null;
+		}
+
+		#endregion
+
+		#region Messages
+
+		// This section is for receiving messages and resolving their handlers asynchronously.
+
+		/// <summary>
+		/// Enqueues a message to the message manager's queue
+		/// </summary>
+		/// <param name="message"></param>
+		private void SendPrivate (Message message)
+		{
+			// If the message is associated with a connection
+			if (message.connection != null)
+			{
+				message.connection.EnqueueToSend (message);
+				return;
+			}
+
+			// Else just send it freely.
+			messageManager.Send (message);
+		}
+
+		/// <summary>
+		/// Continuously receives messages.
+		/// </summary>
+		private void Threaded_ReceiveMessages ()
+		{
+			LowLevel.Message lowLevelMessage = null;
+			Message message = null;
+
+			while (true)
+			{
+				if (!isStarted)
+					return;
+
+				// If there are messages in the queues of connections.
+				message = connectionManager.Receive ();
+				if (message != null)
+					ResolveHandlerOfMessage (message);
+
+				// If there are messages in the message buffer.
+				message = null;
+				lowLevelMessage = messageManager.Receive ();
+				if (lowLevelMessage != null)
+				{
+					message = new Message (lowLevelMessage);
+					HandleReceivedMessage (message);
+				}
+			}
+		}
+
+		/// <summary>
+		/// Resolves the handler associated with this message and adds it to the resolved handlers.
+		/// </summary>
+		/// <param name="message"></param>
+		private void ResolveHandlerOfMessage (Message message)
+		{
+			MessageHandler handler = messageHandler.ResolveHandler (message);
+			if (handler != null)
+			{
+				lock (receivedMessagesLock)
+					receivedMessages.Enqueue (new ReceivedMessage (message, handler.callback));
+			}
+		}
+
+		/// <summary>
+		/// Must be called after a message has been received from the message manager.
+		/// </summary>
+		/// <param name="message"></param>
+		private void HandleReceivedMessage (Message message)
+		{
+			message.connection = connectionManager.ResolveConnection (message.endPoint);
+			if (message.connection != null)
+			{
+				// The message channel ID is assigned in the message itself.
+				message.channel = message.connection.GetMessageChannelByIndex (message.channelId);
+				if (message.channel != null)
+				{
+					message.connection.EnqueueToReceive (message);
+					message = message.connection.DequeueFromReceive ();
+				}
+				else
+				{
+					// If the channel is null, then the message is invalid.
+					message = null;
+				}
+			}
+
+			if (message != null)
+				ResolveHandlerOfMessage (message);
 		}
 
 		#endregion

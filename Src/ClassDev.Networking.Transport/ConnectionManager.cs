@@ -190,6 +190,9 @@ namespace ClassDev.Networking.Transport
 
 		public Message Receive ()
 		{
+			if (connections == null)
+				return null;
+
 			Message message = null;
 			lock (connectionsLock)
 			{
