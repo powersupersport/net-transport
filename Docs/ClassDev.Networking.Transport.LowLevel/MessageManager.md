@@ -6,7 +6,16 @@ The message manager is a class that provides methods for sending/receiving messa
 
 &nbsp;
 
-## Initialization
+## Properties
+
+### ```MessageManager.isStarted```
+```bool isStarted```
+
+&nbsp;
+
+True if the message manager is working. False if stopped.
+
+## Methods
 
 ### ```MessageManager ()```
 Constructor for the MessageManager object.
@@ -16,22 +25,12 @@ Constructor for the MessageManager object.
 - Parameters:
 	- ```udpClient``` - The UdpClient to use for sending/receiving messages. Will throw an exception if null.
 
-### ```MessageManager.isStarted```
-```bool isStarted```
-
-True if the message manager is working. False if stopped.
-
-
 ### ```MessageManager.Stop ()```
-```void Stop ()```
-
 Will stop the send & receive threads, as well as unallocate all queues.
 
+```void Stop ()```
+
 **You should call this before you close your application, as well as set your MessageManager object to null to allow for the garbage collector to clear the memory.**
-
-&nbsp;
-
-## Sending / Receiving
 
 ### ```MessageManager.Send ()```
 Used to enqueue a message to the send queue.
