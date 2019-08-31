@@ -4,11 +4,9 @@ MessageManager depends on ```System.Net.Sockets```.
 
 The message manager is a class that provides methods for sending/receiving messages in a thread-safe manner. It uses the ```Message``` class to construct a message with the necessary info.
 
----
+&nbsp;
 
 ## Initialization
-
----
 
 ### ```MessageManager ()```
 Constructor for the MessageManager object.
@@ -30,11 +28,9 @@ Will stop the send & receive threads, as well as unallocate all queues.
 
 **You should call this before you close your application, as well as set your MessageManager object to null to allow for the garbage collector to clear the memory.**
 
----
+&nbsp;
 
 ## Sending / Receiving
-
----
 
 ### ```MessageManager.Send ()```
 Used to enqueue a message to the send queue.
