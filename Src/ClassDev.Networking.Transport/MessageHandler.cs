@@ -142,14 +142,21 @@ namespace ClassDev.Networking.Transport
 		/// <param name="signature"></param>
 		private void OptimizePrivate (int depth = 0, byte [] signature = null)
 		{
+			if (signature == null)
+				signature = new byte [1];
+
 			this.depth = (byte)depth;
 
 			this.signature = new byte [depth];
-			for (int i = 0; i < signature.Length; i++)
+
+			if (depth > 0)
 			{
-				this.signature [i] = signature [i];
+				for (int i = 0; i < signature.Length; i++)
+				{
+					this.signature [i] = signature [i];
+				}
+				this.signature [depth - 1] = id;
 			}
-			signature [depth - 1] = id;
 
 			if (handlers == null)
 				return;
