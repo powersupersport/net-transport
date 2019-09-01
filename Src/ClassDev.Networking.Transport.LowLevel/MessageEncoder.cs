@@ -15,6 +15,10 @@ namespace ClassDev.Networking.Transport
 			set => stream.Position = value;
 		}
 
+		public MessageEncoder (int bufferSize) : this (new byte [bufferSize])
+		{
+
+		}
 		public MessageEncoder (byte [] buffer)
 		{
 			this.buffer = buffer;
@@ -50,6 +54,11 @@ namespace ClassDev.Networking.Transport
 		public void SetPosition (int position)
 		{
 			stream.Position = position;
+		}
+
+		public override string ToString ()
+		{
+			return string.Join (",", buffer);
 		}
 
 		// =============================================================================
@@ -230,7 +239,7 @@ namespace ClassDev.Networking.Transport
 			writer.Write (values);
 		}
 
-		public void Decode (out char [] values, int count)
+		public void Decode (out char [] values, int count = 0)
 		{
 			values = reader.ReadChars (count);
 		}
