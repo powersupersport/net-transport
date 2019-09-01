@@ -76,7 +76,7 @@ Just remember: **Always use a try-catch when decoding a message!**
 
 **An important note about cheating!**
 
-Note that this doesn't protect against cheating though. If an attacker sends the expected message length, but with other values, then those values will be expected and decoded accordingly. In that case you'd have to look into validating the message data (ex. making sure that the player can actually have the specified health), as well as doing some research on server authoritative design.
+Note that this doesn't protect against cheating though. If an attacker sends the expected message length, but with other values, then those values will be expected and decoded accordingly. In that case you'd have to look into validating the message data (ex. making sure that the player can actually have the specified health), as well as doing some research on **server authoritative design**.
 
 &nbsp;
 
