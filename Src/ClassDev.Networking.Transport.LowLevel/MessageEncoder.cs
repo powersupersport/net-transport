@@ -65,11 +65,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (byte value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out byte value)
 		{
 			value = reader.ReadByte ();
@@ -90,11 +98,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (sbyte value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out sbyte value)
 		{
 			value = reader.ReadSByte ();
@@ -102,11 +118,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (bool value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out bool value)
 		{
 			value = reader.ReadBoolean ();
@@ -114,11 +138,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [2 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (short value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [2 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out short value)
 		{
 			value = reader.ReadInt16 ();
@@ -126,11 +158,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [2 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (ushort value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [2 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out ushort value)
 		{
 			value = reader.ReadUInt16 ();
@@ -138,11 +178,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (int value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out int value)
 		{
 			value = reader.ReadInt32 ();
@@ -150,11 +198,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (uint value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out uint value)
 		{
 			value = reader.ReadUInt32 ();
@@ -162,11 +218,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (long value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out long value)
 		{
 			value = reader.ReadInt64 ();
@@ -174,11 +238,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (ulong value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out ulong value)
 		{
 			value = reader.ReadUInt64 ();
@@ -186,11 +258,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (float value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [4 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out float value)
 		{
 			value = reader.ReadSingle ();
@@ -198,11 +278,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (double value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [8 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out double value)
 		{
 			value = reader.ReadDouble ();
@@ -210,11 +298,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [16 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (decimal value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [16 bytes]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out decimal value)
 		{
 			value = reader.ReadDecimal ();
@@ -222,11 +318,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (char value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// [1 byte]
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out char value)
 		{
 			value = reader.ReadChar ();
@@ -234,11 +338,20 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// [1 byte per each]
+		/// </summary>
+		/// <param name="values"></param>
 		public void Encode (char [] values)
 		{
 			writer.Write (values);
 		}
 
+		/// <summary>
+		/// [1 byte per each]
+		/// </summary>
+		/// <param name="values"></param>
+		/// <param name="count"></param>
 		public void Decode (out char [] values, int count = 0)
 		{
 			values = reader.ReadChars (count);
@@ -246,11 +359,19 @@ namespace ClassDev.Networking.Transport
 
 		// -----------------------------------------------------------------------------
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="value"></param>
 		public void Encode (string value)
 		{
 			writer.Write (value);
 		}
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="value"></param>
 		public void Decode (out string value)
 		{
 			value = reader.ReadString ();

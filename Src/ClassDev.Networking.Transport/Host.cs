@@ -32,6 +32,10 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		public ConnectionManager connectionManager { get; private set; }
 		/// <summary>
+		/// The maximum number of connections for the connection manager.
+		/// </summary>
+		public int maxConnections { get; private set; }
+		/// <summary>
 		/// The message handler used to handle messages.
 		/// </summary>
 		public BaseHandler messageHandler { get; private set; }
@@ -57,7 +61,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Queue of messages with resolved handlers.
 		/// </summary>
-		Queue<ReceivedMessage> receivedMessages = new Queue<ReceivedMessage> ();
+		private Queue<ReceivedMessage> receivedMessages = new Queue<ReceivedMessage> ();
 		/// <summary>
 		/// Thread lock for the received messages.
 		/// </summary>
@@ -85,16 +89,17 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
-		public Host () : this (0)
+		public Host (int maxConnections) : this (0, maxConnections)
 		{
 
 		}
 		/// <summary>
 		/// Constructor with port.
 		/// </summary>
-		public Host (int port)
+		public Host (int port, int maxConnections)
 		{
 			this.port = port;
+			this.maxConnections = maxConnections;
 		}
 
 		/// <summary>
