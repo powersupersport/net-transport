@@ -8,6 +8,11 @@ namespace ClassDev.Networking.Transport
 	public class ConnectionManager
 	{
 		/// <summary>
+		/// Determines how many connections can run on a single thread.
+		/// </summary>
+		public const int ConnectionsPerThread = 8;
+
+		/// <summary>
 		/// 
 		/// </summary>
 		public Connection [] connections { get; private set; }
@@ -17,9 +22,9 @@ namespace ClassDev.Networking.Transport
 		private readonly object connectionsLock = new object ();
 
 		/// <summary>
-		/// The thread for updating the connections.
+		/// The threads for updating the connections.
 		/// </summary>
-		private Thread updateThread = null;
+		private Thread [] updateThreads = null;
 
 		/// <summary>
 		/// 
@@ -80,8 +85,7 @@ namespace ClassDev.Networking.Transport
 
 			SetupConnections ();
 
-			updateThread = new Thread (Threaded_UpdateConnections);
-			updateThread.Start ();
+			SetupUpdateThreads ();
 		}
 
 		/// <summary>
@@ -91,9 +95,9 @@ namespace ClassDev.Networking.Transport
 		{
 			isStarted = false;
 
-			updateThread.Join ();
+			TeardownUpdateThreads ();
 
-			DisposeConnections ();
+			TeardownConnections ();
 		}
 
 		/// <summary>
@@ -245,7 +249,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// Disconnects all connections and deallocates the memory.
 		/// </summary>
-		private void DisposeConnections ()
+		private void TeardownConnections ()
 		{
 			lock (connectionsLock)
 			{
@@ -262,10 +266,52 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// Thread for updating all connections.
+		/// Sets up the update threads.
 		/// </summary>
-		private void Threaded_UpdateConnections ()
+		private void SetupUpdateThreads ()
 		{
+			int length = connections.Length / ConnectionsPerThread;
+			if (connections.Length - length > 0)
+				length += 1;
+
+			updateThreads = new Thread [length];
+
+			for (int i = 0; i < length; i++)
+			{
+				updateThreads [i] = new Thread (new ParameterizedThreadStart (Threaded_UpdateConnections));
+				updateThreads [i].Start (i);
+			}
+		}
+
+		/// <summary>
+		/// Stops the update threads.
+		/// </summary>
+		private void TeardownUpdateThreads ()
+		{
+			for (int i = 0; i < updateThreads.Length; i++)
+			{
+				if (updateThreads [i] == null)
+					continue;
+
+				updateThreads [i].Join ();
+			}
+
+			updateThreads = null;
+		}
+
+		/// <summary>
+		/// Thread for updating a specific chunk of connections.
+		/// </summary>
+		private void Threaded_UpdateConnections (object rawIndex)
+		{
+			int index = (int)rawIndex;
+
+			int startIndex = index * ConnectionsPerThread;
+			int endIndex = startIndex + ConnectionsPerThread;
+
+			if (endIndex > maxConnections)
+				endIndex = maxConnections;
+
 			int i = 0;
 			Connection connection = null;
 
@@ -274,7 +320,7 @@ namespace ClassDev.Networking.Transport
 				if (!isStarted)
 					return;
 
-				for (i = 0; i < maxConnections; i++)
+				for (i = startIndex; i < endIndex; i++)
 				{
 					lock (connectionsLock)
 					{
@@ -304,6 +350,8 @@ namespace ClassDev.Networking.Transport
 						connection.Disconnect ();
 					}
 				}
+
+				Thread.Sleep (1);
 			}
 		}
 

@@ -164,6 +164,8 @@ namespace ClassDev.Networking.Transport.LowLevel
 
 					udpClient.Send (message.buffer, (int)message.encoder.position, message.endPoint);
 				}
+
+				Thread.Sleep (1);
 			}
 		}
 
@@ -195,6 +197,9 @@ namespace ClassDev.Networking.Transport.LowLevel
 				{
 
 				}
+
+				// Even 1ms lets the processor take a break nicely :)
+				Thread.Sleep (1);
 			}
 		}
 

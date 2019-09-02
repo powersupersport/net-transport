@@ -174,6 +174,7 @@ namespace ClassDev.Networking.Transport
 			this.endPoint = endPoint;
 		}
 
+		// TODO: MUST BE THREAD SAFE!
 		/// <summary>
 		/// Disconnects the connection.
 		/// </summary>
