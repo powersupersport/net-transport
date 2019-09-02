@@ -8,15 +8,15 @@ namespace ClassDev.Networking.Transport
 	public class Connection
 	{
 		/// <summary>
-		/// 
+		/// The waiting time before a connection is considered as unsuccessfull after starting a connect action.
 		/// </summary>
 		public const int ConnectTimeout = 10000;
 		/// <summary>
-		/// 
+		/// The waiting time before a connection is considered disconnected if no packets are received.
 		/// </summary>
 		public const int DisconnectTimeout = 3000;
 		/// <summary>
-		/// 
+		/// The waiting time between each keep-alive packet in milliseconds.
 		/// </summary>
 		public const int Frequency = 200;
 
@@ -26,68 +26,68 @@ namespace ClassDev.Networking.Transport
 		public int id { get; private set; }
 
 		/// <summary>
-		/// 
+		/// True if a connection has been established successfully.
+		/// Note that this will still be true if the connection is later on disconnected.
 		/// </summary>
 		public bool isSuccessful = false;
 		/// <summary>
-		/// 
+		/// True if the connection is no longer active.
 		/// </summary>
 		public bool isDisconnected = false;
-
 		/// <summary>
-		/// The time when the disconnection occurrs.
+		/// The timestamp of when the disconnection occurrs.
 		/// </summary>
-		public long disconnectionTime { get; private set; }
+		public long disconnectionTimestamp { get; private set; }
 
 		/// <summary>
-		/// 
+		/// The message manager used for sending messages.
 		/// </summary>
 		private MessageManager messageManager;
 		/// <summary>
-		/// 
+		/// The remote end point of this connection.
 		/// </summary>
-		public IPEndPoint endPoint = null;
+		public IPEndPoint endPoint { get; private set; }
 
 		/// <summary>
-		/// 
+		/// The channels used for managing reliability/order of messages.
 		/// </summary>
-		public MessageChannel [] channels;
+		public MessageChannel [] channels { get; private set; }
 		/// <summary>
-		/// 
+		/// Used when enqueueing/dequeueing outgoing messages.
 		/// </summary>
 		private readonly object sendChannelLock = new object ();
 		/// <summary>
-		/// 
+		/// Used when enqueueing/dequeueing incoming messages.
 		/// </summary>
 		private readonly object receiveChannelLock = new object ();
 
 		/// <summary>
-		/// 
+		/// Used when sending connection messages.
 		/// </summary>
 		private MessageHandler connectionHandler;
 		/// <summary>
-		/// 
+		/// Used when sending keep-alive messages.
 		/// </summary>
 		private MessageHandler keepAliveHandler;
 		/// <summary>
-		/// 
+		/// Used when sending acknowledgement messages.
 		/// </summary>
 		private MessageHandler acknowledgementHandler;
 		/// <summary>
-		/// 
+		/// Used when sending disconnect messages.
 		/// </summary>
 		private MessageHandler disconnectionHandler;
 
 		/// <summary>
-		/// 
+		/// Keeps the id of the keep-alive packet and its timestamp when it was sent.
 		/// </summary>
 		private struct KeepAlive
 		{
 			public int id;
-			public long time;
+			public long timestamp;
 		}
 		/// <summary>
-		/// 
+		/// Keeps track of sent keep-alive packets to compare for ping.
 		/// </summary>
 		private CircularArray<KeepAlive> keepAlives = new CircularArray<KeepAlive> (10);
 		/// <summary>
@@ -96,29 +96,28 @@ namespace ClassDev.Networking.Transport
 		private readonly object keepAlivesLock = new object ();
 
 		/// <summary>
-		/// 
+		/// The id of the last sent keep-alive packet (increments on every packet sent).
 		/// </summary>
 		private int currentKeepAliveId = 0;
 		/// <summary>
-		/// 
+		/// The timestamp in milliseconds of the last sent keep-alive packet (used to track when to send another packet).
 		/// </summary>
-		private long currentKeepAliveTime = 0;
+		private long currentKeepAliveTimestamp = 0;
+		/// <summary>
+		/// The timestamp in milliseconds of the latest packet received.
+		/// </summary>
+		private long latestPacketReceivedTimestamp = 0;
 
 		/// <summary>
-		/// 
-		/// </summary>
-		private long latestPacketReceivedTime = 0;
-
-		/// <summary>
-		/// 
+		/// The ping of the latest packet.
 		/// </summary>
 		public int latestPing { get; private set; }
 		/// <summary>
-		/// 
+		/// The averaged ping over two consequetive packets.
 		/// </summary>
 		public int averagePing { get; private set; }
 		/// <summary>
-		/// 
+		/// Alias for averagePing.
 		/// </summary>
 		public int ping
 		{
@@ -126,7 +125,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// The stopwatch for tracking time in milliseconds.
 		/// </summary>
 		public readonly Stopwatch stopwatch;
 
@@ -156,7 +155,7 @@ namespace ClassDev.Networking.Transport
 			acknowledgementHandler = connectionManager.messageHandler.acknowledgementHandler;
 
 			stopwatch = connectionManager.stopwatch;
-			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
+			latestPacketReceivedTimestamp = stopwatch.ElapsedMilliseconds;
 
 			if (channelTemplates == null)
 				channelTemplates = new MessageChannelTemplate [0];
@@ -176,7 +175,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Disconnects the connection.
 		/// </summary>
 		public void Disconnect ()
 		{
@@ -184,7 +183,7 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			isDisconnected = true;
-			disconnectionTime = stopwatch.ElapsedMilliseconds;
+			disconnectionTimestamp = stopwatch.ElapsedMilliseconds;
 
 			UnityEngine.Debug.Log ("Disconnected!");
 
@@ -195,7 +194,21 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Returns the channel instance by the specified index.
+		/// </summary>
+		/// <param name="index">The channel index.</param>
+		/// <returns></returns>
+		public MessageChannel GetMessageChannelByIndex (byte index)
+		{
+			if (index >= channels.Length)
+				return null;
+
+			return channels [index];
+		}
+
+		// TODO: Research if public is necessary
+		/// <summary>
+		/// Enqueues a message to the send queue.
 		/// </summary>
 		/// <param name="message"></param>
 		public void EnqueueToSend (Message message)
@@ -218,8 +231,9 @@ namespace ClassDev.Networking.Transport
 			}
 		}
 
+		// TODO: Research if public is necessary
 		/// <summary>
-		/// 
+		/// Dequeues a message from the send queue.
 		/// </summary>
 		/// <returns></returns>
 		public Message DequeueFromSend ()
@@ -244,8 +258,9 @@ namespace ClassDev.Networking.Transport
 			return null;
 		}
 
+		// TODO: Research if public is necessary
 		/// <summary>
-		/// 
+		/// Enqueues a message to the receive queue.
 		/// </summary>
 		/// <param name="message"></param>
 		public void EnqueueToReceive (Message message)
@@ -261,7 +276,7 @@ namespace ClassDev.Networking.Transport
 			}
 
 			message.SetTime (stopwatch.ElapsedMilliseconds);
-			latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
+			latestPacketReceivedTimestamp = stopwatch.ElapsedMilliseconds;
 
 			lock (receiveChannelLock)
 			{
@@ -269,8 +284,9 @@ namespace ClassDev.Networking.Transport
 			}
 		}
 
+		// TODO: Research if public is necessary
 		/// <summary>
-		/// 
+		/// Dequeues a message from the receive queue.
 		/// </summary>
 		/// <returns></returns>
 		public Message DequeueFromReceive ()
@@ -296,7 +312,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Sends a connection message.
 		/// </summary>
 		private void SendConnectionMessage ()
 		{
@@ -308,7 +324,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Sends a keep alive message.
 		/// </summary>
 		private void SendKeepAliveMessage ()
 		{
@@ -324,7 +340,7 @@ namespace ClassDev.Networking.Transport
 
 				KeepAlive keepAlive = new KeepAlive ();
 				keepAlive.id = currentKeepAliveId;
-				keepAlive.time = stopwatch.ElapsedMilliseconds;
+				keepAlive.timestamp = stopwatch.ElapsedMilliseconds;
 
 				keepAlives.Push (keepAlive);
 			}
@@ -336,9 +352,20 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
+		/// Sends a disconnection message
+		/// </summary>
+		private void SendDisconnectionMessage ()
+		{
+			Message message = new Message (this, disconnectionHandler, 0, 1);
+			message.encoder.Encode (0);
+			messageManager.Send (message);
+		}
+
+		// TODO: Must not be public
+		/// <summary>
 		/// This should be called after a keep alive message has been ping-ponged (sent and received back).
 		/// </summary>
-		/// <param name="message"></param>
+		/// <param name="id">The id of the keep-alive.</param>
 		public void HandleKeepAlive (int id)
 		{
 			if (isDisconnected)
@@ -354,39 +381,17 @@ namespace ClassDev.Networking.Transport
 					if (keepAlives [-i].id != id)
 						continue;
 
-					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [-i].time);
+					latestPing = (int)(stopwatch.ElapsedMilliseconds - keepAlives [-i].timestamp);
 					averagePing = (averagePing + latestPing) / 2;
 
-					latestPacketReceivedTime = stopwatch.ElapsedMilliseconds;
+					latestPacketReceivedTimestamp = stopwatch.ElapsedMilliseconds;
 
 					break;
 				}
 			}
 		}
 
-		/// <summary>
-		/// 
-		/// </summary>
-		private void SendDisconnectionMessage ()
-		{
-			Message message = new Message (this, disconnectionHandler, 0, 1);
-			message.encoder.Encode (0);
-			messageManager.Send (message);
-		}
-
-		/// <summary>
-		/// Returns the channel instance with the specified index.
-		/// </summary>
-		/// <param name="index"></param>
-		/// <returns></returns>
-		public MessageChannel GetMessageChannelByIndex (byte index)
-		{
-			if (index >= channels.Length)
-				return null;
-
-			return channels [index];
-		}
-
+		// TODO: Must not be public
 		/// <summary>
 		/// This method is called from a thread in the connection manager!
 		/// </summary>
@@ -402,26 +407,26 @@ namespace ClassDev.Networking.Transport
 
 			if (!isSuccessful)
 			{
-				if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTime > ConnectTimeout)
+				if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTimestamp > ConnectTimeout)
 					throw new TimeoutException ("Failed to connect to " + endPoint.ToString ());
 
-				if (stopwatch.ElapsedMilliseconds - currentKeepAliveTime < Frequency)
+				if (stopwatch.ElapsedMilliseconds - currentKeepAliveTimestamp < Frequency)
 					return;
 
 				SendConnectionMessage ();
-				currentKeepAliveTime = stopwatch.ElapsedMilliseconds;
+				currentKeepAliveTimestamp = stopwatch.ElapsedMilliseconds;
 
 				return;
 			}
 
-			if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTime > DisconnectTimeout)
+			if (stopwatch.ElapsedMilliseconds - latestPacketReceivedTimestamp > DisconnectTimeout)
 				throw new TimeoutException ("No packets received for too long.");
 
-			if (currentKeepAliveTime + Frequency > stopwatch.ElapsedMilliseconds)
+			if (currentKeepAliveTimestamp + Frequency > stopwatch.ElapsedMilliseconds)
 				return;
 
 			SendKeepAliveMessage ();
-			currentKeepAliveTime = (int)stopwatch.ElapsedMilliseconds;
+			currentKeepAliveTimestamp = (int)stopwatch.ElapsedMilliseconds;
 		}
 	}
 }

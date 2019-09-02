@@ -10,6 +10,20 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// 
 		/// </summary>
+		public Connection [] connections { get; private set; }
+		/// <summary>
+		/// Thread lock for the connections.
+		/// </summary>
+		private readonly object connectionsLock = new object ();
+
+		/// <summary>
+		/// The thread for updating the connections.
+		/// </summary>
+		private Thread updateThread = null;
+
+		/// <summary>
+		/// 
+		/// </summary>
 		public BaseHandler messageHandler;
 
 		/// <summary>
@@ -22,31 +36,15 @@ namespace ClassDev.Networking.Transport
 		/// </summary>
 		private MessageChannelTemplate [] channelTemplates = null;
 
-		// TODO: MUST NOT BE PUBLIC ! ! !
 		/// <summary>
 		/// 
 		/// </summary>
-		public Connection [] connections = null;
-		/// <summary>
-		/// Thread lock for the connections.
-		/// </summary>
-		private readonly object connectionsLock = new object ();
+		public int maxConnections { get; private set; }
 
 		/// <summary>
 		/// 
 		/// </summary>
-		private Thread thread;
-
-		/// <summary>
-		/// 
-		/// </summary>
-		public int maxConnections = 1;
-
-		// TODO: Fix public
-		/// <summary>
-		/// 
-		/// </summary>
-		public Stopwatch stopwatch;
+		public Stopwatch stopwatch { get; private set; }
 
 		/// <summary>
 		/// 
@@ -82,8 +80,8 @@ namespace ClassDev.Networking.Transport
 
 			SetupConnections ();
 
-			thread = new Thread (Threaded_UpdateConnections);
-			thread.Start ();
+			updateThread = new Thread (Threaded_UpdateConnections);
+			updateThread.Start ();
 		}
 
 		/// <summary>
@@ -93,7 +91,7 @@ namespace ClassDev.Networking.Transport
 		{
 			isStarted = false;
 
-			thread.Join ();
+			updateThread.Join ();
 
 			DisposeConnections ();
 		}
@@ -188,6 +186,10 @@ namespace ClassDev.Networking.Transport
 			}
 		}
 
+		/// <summary>
+		/// Receives a message 
+		/// </summary>
+		/// <returns></returns>
 		public Message Receive ()
 		{
 			if (connections == null)
@@ -230,7 +232,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Sets up the connections array.
 		/// </summary>
 		private void SetupConnections ()
 		{
@@ -241,7 +243,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Disconnects all connections and deallocates the memory.
 		/// </summary>
 		private void DisposeConnections ()
 		{
@@ -260,7 +262,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Thread for updating all connections.
 		/// </summary>
 		private void Threaded_UpdateConnections ()
 		{
@@ -286,7 +288,7 @@ namespace ClassDev.Networking.Transport
 							continue;
 
 						// TODO: Add a constant for the timeout (2000).
-						if (connection.isDisconnected && stopwatch.ElapsedMilliseconds - connection.disconnectionTime > 2000)
+						if (connection.isDisconnected && stopwatch.ElapsedMilliseconds - connection.disconnectionTimestamp > 2000)
 						{
 							connections [i] = null;
 							continue;
@@ -297,9 +299,8 @@ namespace ClassDev.Networking.Transport
 					{
 						connection.Threaded_Update ();
 					}
-					catch (TimeoutException e)
+					catch (TimeoutException)
 					{
-						UnityEngine.Debug.LogError (e.Message);
 						connection.Disconnect ();
 					}
 				}
@@ -308,6 +309,9 @@ namespace ClassDev.Networking.Transport
 
 		#region Handlers
 
+		/// <summary>
+		/// Sets up all necessary handlers for the connection manager.
+		/// </summary>
 		private void SetupHandlers ()
 		{
 			messageHandler.connectionHandler = messageHandler.Register (HandleConnectionMessage);
@@ -321,10 +325,10 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Handles connection messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleConnectionMessage (Message message)
+		private void HandleConnectionMessage (Message message)
 		{
 			if (message.connection == null)
 			{
@@ -337,10 +341,10 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Handles keep-alive messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleKeepAliveMessage (Message message)
+		private void HandleKeepAliveMessage (Message message)
 		{
 			if (message.connection == null)
 				return;
@@ -375,10 +379,10 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Handles disconnection messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleDisconnectionMessage (Message message)
+		private void HandleDisconnectionMessage (Message message)
 		{
 			if (message.connection == null)
 				return;
@@ -387,10 +391,10 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Handles acknowledgement messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleAcknowledgementMessage (Message message)
+		private void HandleAcknowledgementMessage (Message message)
 		{
 			if (message.connection == null)
 				return;
@@ -419,19 +423,19 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Handles zipped (combined) messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleMultipleMessage (Message message)
+		private void HandleMultipleMessage (Message message)
 		{
 
 		}
 
 		/// <summary>
-		/// 
+		/// Handles fragmented messages.
 		/// </summary>
 		/// <param name="message"></param>
-		public void HandleFragmentMessage (Message message)
+		private void HandleFragmentMessage (Message message)
 		{
 
 		}
