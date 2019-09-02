@@ -38,7 +38,7 @@ namespace Tests
         [Test]
 		public void host_can_be_created_and_stopped ()
 		{
-			host = new Host (7777);
+			host = new Host (7777, 1);
 
 			Assert.That (host.port == 7777);
 
@@ -64,8 +64,8 @@ namespace Tests
 		[Test]
 		public void host_can_connect_to_another_host ()
 		{
-			host1 = new Host (7777);
-			host2 = new Host (7778);
+			host1 = new Host (7777, 1);
+			host2 = new Host (7778, 1);
 			host1.Start ();
 			host2.Start ();
 
@@ -92,8 +92,8 @@ namespace Tests
 		[Test]
 		public void both_hosts_can_send_messages_to_each_other ()
 		{
-			host1 = new Host (7777);
-			host2 = new Host (7778);
+			host1 = new Host (7777, 1);
+			host2 = new Host (7778, 1);
 
 			host1.Start ();
 			host2.Start ();
