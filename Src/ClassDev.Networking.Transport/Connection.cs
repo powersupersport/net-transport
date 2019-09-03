@@ -186,8 +186,6 @@ namespace ClassDev.Networking.Transport
 			isDisconnected = true;
 			disconnectionTimestamp = stopwatch.ElapsedMilliseconds;
 
-			UnityEngine.Debug.Log ("Disconnected!");
-
 			for (int i = 0; i < 3; i++)
 			{
 				SendDisconnectionMessage ();

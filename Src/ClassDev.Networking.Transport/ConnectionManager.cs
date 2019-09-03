@@ -13,13 +13,17 @@ namespace ClassDev.Networking.Transport
 		public const int ConnectionsPerThread = 8;
 
 		/// <summary>
-		/// 
+		/// The allocated space for connections.
 		/// </summary>
 		public Connection [] connections { get; private set; }
 		/// <summary>
 		/// Thread lock for the connections.
 		/// </summary>
 		private readonly object connectionsLock = new object ();
+		/// <summary>
+		/// The circular index of the current connection when receiving messages.
+		/// </summary>
+		private int currentReceiveIndex = 0;
 
 		/// <summary>
 		/// The threads for updating the connections.
@@ -27,37 +31,37 @@ namespace ClassDev.Networking.Transport
 		private Thread [] updateThreads = null;
 
 		/// <summary>
-		/// 
+		/// The base handler used for registering the necessary callbacks for this connection.
 		/// </summary>
-		public BaseHandler messageHandler;
+		public BaseHandler messageHandler { get; private set; }
 
 		/// <summary>
-		/// 
+		/// The message manager used for sending/receiving messages.
 		/// </summary>
-		public MessageManager messageManager;
+		public MessageManager messageManager { get; private set; }
 
 		/// <summary>
-		/// 
+		/// The default channels used for each connection.
 		/// </summary>
 		private MessageChannelTemplate [] channelTemplates = null;
 
 		/// <summary>
-		/// 
+		/// The maximum connections allowed to connect simultaneously.
 		/// </summary>
 		public int maxConnections { get; private set; }
 
 		/// <summary>
-		/// 
+		/// The stopwatch for tracking time in milliseconds.
 		/// </summary>
 		public Stopwatch stopwatch { get; private set; }
 
 		/// <summary>
-		/// 
+		/// True if the connection manager is active.
 		/// </summary>
 		public bool isStarted { get; private set; }
 
 		/// <summary>
-		/// 
+		/// Constructor for connection manager.
 		/// </summary>
 		/// <param name="messageManager"></param>
 		/// <param name="maxConnections"></param>
@@ -75,7 +79,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Starts the connection manager.
 		/// </summary>
 		public void Start ()
 		{
@@ -89,7 +93,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Stops the connection manager. You should call that before closing the application.
 		/// </summary>
 		public void Stop ()
 		{
@@ -174,7 +178,7 @@ namespace ClassDev.Networking.Transport
 			lock (connectionsLock)
 			{
 				// TODO: Optimize...
-				for (int i = 0; i < connections.Length; i++)
+				for (int i = 0; i < maxConnections; i++)
 				{
 					if (connections [i] == null)
 						continue;
@@ -191,26 +195,30 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// Receives a message 
+		/// Receives a message from all connections.
 		/// </summary>
 		/// <returns></returns>
 		public Message Receive ()
 		{
-			if (connections == null)
-				return null;
-
 			Message message = null;
 			lock (connectionsLock)
 			{
-				// TODO: Currently prioritizes the first connection. Should be circular.
-				for (int i = 0; i < connections.Length; i++)
+				if (connections == null)
+					return null;
+
+				for (int i = 0; i < maxConnections; i++)
 				{
-					if (connections [i] == null || connections [i].isDisconnected)
+					int index = (i + currentReceiveIndex) % maxConnections;
+
+					if (connections [index] == null || connections [index].isDisconnected)
 						continue;
 
-					message = connections [i].DequeueFromReceive ();
+					message = connections [index].DequeueFromReceive ();
 					if (message != null)
+					{
+						currentReceiveIndex = i;
 						return message;
+					}
 				}
 			}
 
@@ -218,85 +226,50 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// Returns a free index for a connection to take over.
+		/// Returns a free index for a connection to take over. It also tries to select it on a free thread.
 		/// </summary>
 		/// <returns></returns>
 		private int GetFreeConnectionIndex ()
 		{
-			lock (connectionsLock)
-			{
-				for (int i = 0; i < connections.Length; i++)
-				{
-					if (connections [i] == null)
-						return i;
-				}
+			// This math here does the following example...
+			// With ConnectionsPerThread = 10 and maxConnections = 30:
+			// 0, 10, 20, 1, 11, 21, 2, 12, 22 etc..
+			
+			// This is done, so the workload is separated evenly on each thread for maximum performance.
 
-				return -1;
-			}
-		}
+			// If the max connections are not exactly divisible, get the remaining chunk.
+			int remainingConnections = maxConnections % ConnectionsPerThread;
 
-		/// <summary>
-		/// Sets up the connections array.
-		/// </summary>
-		private void SetupConnections ()
-		{
-			lock (connectionsLock)
-			{
-				connections = new Connection [maxConnections];
-			}
-		}
+			// Rounded means the number is made to be exactly divisible by ConnectionsPerThread.
+			int roundedConnections = maxConnections - remainingConnections;
 
-		/// <summary>
-		/// Disconnects all connections and deallocates the memory.
-		/// </summary>
-		private void TeardownConnections ()
-		{
+			// If there are remaining connections, then we add an extra chunk to make it exactly divisible.
+			if (remainingConnections > 0)
+				roundedConnections += ConnectionsPerThread;
+
 			lock (connectionsLock)
 			{
 				for (int i = 0; i < maxConnections; i++)
 				{
-					if (connections [i] == null)
+					// This one counts as follows: 0,  0,  0,  1,  1,  1,  2,  2,  2 etc...
+					int indexToAdd = (i * ConnectionsPerThread) / roundedConnections;
+
+					// This one counts as follows: 0, 10, 20,  0, 10, 20,  0, 10, 20 etc...
+					int remainderIndex = (i * ConnectionsPerThread) % roundedConnections;
+
+					// Both combined give us evenly distributed numbers.
+					int index = remainderIndex + indexToAdd;
+
+					// Although we must check if the index exceeds the length of the connections as this might happen.
+					if (index >= maxConnections)
 						continue;
 
-					connections [i].Disconnect ();
+					if (connections [index] == null)
+						return index;
 				}
 
-				connections = null;
+				return -1;
 			}
-		}
-
-		/// <summary>
-		/// Sets up the update threads.
-		/// </summary>
-		private void SetupUpdateThreads ()
-		{
-			int length = connections.Length / ConnectionsPerThread;
-			if (connections.Length - length > 0)
-				length += 1;
-
-			updateThreads = new Thread [length];
-
-			for (int i = 0; i < length; i++)
-			{
-				updateThreads [i] = new Thread (new ParameterizedThreadStart (Threaded_UpdateConnections));
-				updateThreads [i].Start (i);
-			}
-		}
-
-		/// <summary>
-		/// Stops the update threads.
-		/// </summary>
-		private void TeardownUpdateThreads ()
-		{
-			for (int i = 0; i < updateThreads.Length; i++)
-			{
-				if (updateThreads [i] == null)
-					continue;
-
-				updateThreads [i].Join ();
-			}
-
-			updateThreads = null;
 		}
 
 		/// <summary>
@@ -354,6 +327,74 @@ namespace ClassDev.Networking.Transport
 				Thread.Sleep (1);
 			}
 		}
+
+		#region Setup
+
+		/// <summary>
+		/// Sets up the connections array.
+		/// </summary>
+		private void SetupConnections ()
+		{
+			lock (connectionsLock)
+			{
+				connections = new Connection [maxConnections];
+			}
+		}
+
+		/// <summary>
+		/// Disconnects all connections and deallocates the memory.
+		/// </summary>
+		private void TeardownConnections ()
+		{
+			lock (connectionsLock)
+			{
+				for (int i = 0; i < maxConnections; i++)
+				{
+					if (connections [i] == null)
+						continue;
+
+					connections [i].Disconnect ();
+				}
+
+				connections = null;
+			}
+		}
+
+		/// <summary>
+		/// Sets up the update threads.
+		/// </summary>
+		private void SetupUpdateThreads ()
+		{
+			int length = maxConnections / ConnectionsPerThread;
+			if (maxConnections - length > 0)
+				length += 1;
+
+			updateThreads = new Thread [length];
+
+			for (int i = 0; i < length; i++)
+			{
+				updateThreads [i] = new Thread (new ParameterizedThreadStart (Threaded_UpdateConnections));
+				updateThreads [i].Start (i);
+			}
+		}
+
+		/// <summary>
+		/// Stops the update threads.
+		/// </summary>
+		private void TeardownUpdateThreads ()
+		{
+			for (int i = 0; i < updateThreads.Length; i++)
+			{
+				if (updateThreads [i] == null)
+					continue;
+
+				updateThreads [i].Join ();
+			}
+
+			updateThreads = null;
+		}
+
+		#endregion
 
 		#region Handlers
 

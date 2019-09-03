@@ -73,7 +73,7 @@ namespace Tests
 
 			Assert.NotNull (connection, "Connect doesn't return a connection.");
 
-			for (int i = 0; i < 20; i++)
+			for (int i = 0; i < 30; i++)
 			{
 				host1.Update ();
 				host2.Update ();
