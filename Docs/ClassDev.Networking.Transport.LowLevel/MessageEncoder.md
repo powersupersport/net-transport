@@ -64,7 +64,7 @@ try
 }
 catch (System.Exception)
 {
-    // Do domething if the message fails.
+    // Do something if the message fails.
     // In most cases, just return out of the method you use for decoding.
     return;
 }

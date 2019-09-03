@@ -11,9 +11,9 @@ The message manager is a class that provides methods for sending/receiving messa
 ### ```MessageManager.isStarted```
 ```bool isStarted```
 
-&nbsp;
-
 True if the message manager is working. False if stopped.
+
+&nbsp;
 
 ## Methods
 
