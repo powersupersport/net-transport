@@ -57,7 +57,7 @@ namespace ClassDev.Networking.Transport.LowLevel
 		{
 			if (!isStarted)
 				return;
-
+			
 			isStarted = false;
 
 			if (sendThread.IsAlive)

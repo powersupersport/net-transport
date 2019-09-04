@@ -13,6 +13,15 @@ namespace ClassDev.Networking.Transport
 		public const int ConnectionsPerThread = 8;
 
 		/// <summary>
+		/// Called whenever a connection is successful.
+		/// </summary>
+		public event System.Action<Connection> OnConnect;
+		/// <summary>
+		/// Called whenever a connection has been disconnected.
+		/// </summary>
+		public event System.Action<Connection> OnDisconnect;
+
+		/// <summary>
 		/// The allocated space for connections.
 		/// </summary>
 		public Connection [] connections { get; private set; }
@@ -295,6 +304,8 @@ namespace ClassDev.Networking.Transport
 
 				for (i = startIndex; i < endIndex; i++)
 				{
+					connection = null;
+
 					lock (connectionsLock)
 					{
 						// In case the connections object gets unreferenced in another thread while it's unlocked.
@@ -426,7 +437,12 @@ namespace ClassDev.Networking.Transport
 				return;
 			}
 
-			message.connection.isSuccessful = true;
+			if (!message.connection.isSuccessful)
+			{
+				message.connection.SetAsSuccessful ();
+
+				OnConnect?.Invoke (message.connection);
+			}
 		}
 
 		/// <summary>
@@ -437,10 +453,6 @@ namespace ClassDev.Networking.Transport
 		{
 			if (message.connection == null)
 				return;
-
-			// TODO: Should have its own dedicated method.
-			if (!message.connection.isSuccessful)
-				message.connection.isSuccessful = true;
 
 			int id = 0;
 			bool response = false;
@@ -477,6 +489,12 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			message.connection.Disconnect ();
+
+			if (!message.connection.disconnectEventCalled)
+			{
+				OnDisconnect?.Invoke (message.connection);
+				message.connection.SetDisconnectEventAsCalled ();
+			}
 		}
 
 		/// <summary>

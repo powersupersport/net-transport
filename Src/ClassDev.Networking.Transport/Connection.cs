@@ -29,15 +29,19 @@ namespace ClassDev.Networking.Transport
 		/// True if a connection has been established successfully.
 		/// Note that this will still be true if the connection is later on disconnected.
 		/// </summary>
-		public bool isSuccessful = false;
+		public bool isSuccessful { get; private set; }
 		/// <summary>
 		/// True if the connection is no longer active.
 		/// </summary>
-		public bool isDisconnected = false;
+		public bool isDisconnected { get; private set; }
 		/// <summary>
 		/// The timestamp of when the disconnection occurrs.
 		/// </summary>
 		public long disconnectionTimestamp { get; private set; }
+		/// <summary>
+		/// True if the OnDisconnect event has been called.
+		/// </summary>
+		internal bool disconnectEventCalled { get; private set; }
 
 		/// <summary>
 		/// The message manager used for sending messages.
@@ -356,22 +360,42 @@ namespace ClassDev.Networking.Transport
 		private void SendDisconnectionMessage ()
 		{
 			Message message = new Message (this, disconnectionHandler, 0, 1);
-			message.encoder.Encode (0);
+
+			// TODO: 0 is the error code
+			message.encoder.Encode ((byte)0);
+
 			messageManager.Send (message);
+
+			// Send the same message to this host to trigger the OnDisconnect event.
+			message = new Message (message);
+			EnqueueToReceive (message);
 		}
 
-		// TODO: Must not be public
+		/// <summary>
+		/// Sets the connection as successful. This is only called from the ConnectionManager.
+		/// </summary>
+		internal void SetAsSuccessful ()
+		{
+			isSuccessful = true;
+			SendConnectionMessage ();
+		}
+
+		/// <summary>
+		/// Sets the disconnection event as called. This is only called from the ConnectionManager.
+		/// </summary>
+		internal void SetDisconnectEventAsCalled ()
+		{
+			disconnectEventCalled = true;
+		}
+
 		/// <summary>
 		/// This should be called after a keep alive message has been ping-ponged (sent and received back).
 		/// </summary>
 		/// <param name="id">The id of the keep-alive.</param>
-		public void HandleKeepAlive (int id)
+		internal void HandleKeepAlive (int id)
 		{
-			if (isDisconnected)
+			if (isDisconnected || !isSuccessful)
 				return;
-
-			if (!isSuccessful)
-				isSuccessful = true;
 
 			lock (keepAlivesLock)
 			{
@@ -394,7 +418,7 @@ namespace ClassDev.Networking.Transport
 		/// <summary>
 		/// This method is called from a thread in the connection manager!
 		/// </summary>
-		public void Threaded_Update ()
+		internal void Threaded_Update ()
 		{
 			if (isDisconnected)
 				return;

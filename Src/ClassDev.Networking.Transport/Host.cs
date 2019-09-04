@@ -27,6 +27,7 @@ namespace ClassDev.Networking.Transport
 		/// The message manager used for managing sending and receiving messages. Use only if no methods in this class fit your needs.
 		/// </summary>
 		public MessageManager messageManager { get; private set; }
+
 		/// <summary>
 		/// The connection manager used for managing connections. Use only if no methods in this class fit your needs.
 		/// </summary>
@@ -35,6 +36,23 @@ namespace ClassDev.Networking.Transport
 		/// The maximum number of connections for the connection manager.
 		/// </summary>
 		public int maxConnections { get; private set; }
+		/// <summary>
+		/// Called whenever a connection is successful (alias for connectionManager.OnConnect).
+		/// </summary>
+		public event Action<Connection> OnConnect
+		{
+			add => connectionManager.OnConnect += value;
+			remove => connectionManager.OnConnect -= value;
+		}
+		/// <summary>
+		/// Called whenever a connection is disconnected (alias for connectionManager.OnDisconnect).
+		/// </summary>
+		public event Action<Connection> OnDisconnect
+		{
+			add => connectionManager.OnDisconnect += value;
+			remove => connectionManager.OnDisconnect -= value;
+		}
+
 		/// <summary>
 		/// The message handler used to handle messages.
 		/// </summary>
@@ -458,8 +476,8 @@ namespace ClassDev.Networking.Transport
 		/// <param name="message"></param>
 		private void HandleReceivedMessage (Message message)
 		{
-			message.connection = connectionManager.ResolveConnection (message.endPoint);
-			if (message.connection != null)
+			message.connection = connectionManager.ResolveConnection (message.endPoint, true);
+			if (message.connection != null && !message.connection.isDisconnected)
 			{
 				// The message channel ID is assigned in the message itself.
 				message.channel = message.connection.GetMessageChannelByIndex (message.channelId);
