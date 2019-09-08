@@ -180,6 +180,8 @@ namespace ClassDev.Networking.Transport
 					receivedMessages.Dequeue ().Handle ();
 				}
 			}
+
+			connectionManager.Update ();
 		}
 
 		/// <summary>
@@ -363,6 +365,9 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			connectionManager.Stop ();
+
+			connectionManager.Update ();
+
 			connectionManager = null;
 		}
 

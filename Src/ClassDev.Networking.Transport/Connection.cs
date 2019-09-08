@@ -38,15 +38,15 @@ namespace ClassDev.Networking.Transport
 		/// The timestamp of when the disconnection occurrs.
 		/// </summary>
 		public long disconnectionTimestamp { get; private set; }
-		/// <summary>
-		/// True if the OnDisconnect event has been called.
-		/// </summary>
-		internal bool disconnectEventCalled { get; private set; }
 
+		/// <summary>
+		/// The connection manager controlling this connection.
+		/// </summary>
+		public ConnectionManager connectionManager { get; private set; }
 		/// <summary>
 		/// The message manager used for sending messages.
 		/// </summary>
-		private MessageManager messageManager;
+		private MessageManager messageManager = null;
 		/// <summary>
 		/// The remote end point of this connection.
 		/// </summary>
@@ -152,6 +152,7 @@ namespace ClassDev.Networking.Transport
 		{
 			this.id = id;
 
+			this.connectionManager = connectionManager;
 			messageManager = connectionManager.messageManager;
 			connectionHandler = connectionManager.messageHandler.connectionHandler;
 			keepAliveHandler = connectionManager.messageHandler.keepAliveHandler;
@@ -189,6 +190,8 @@ namespace ClassDev.Networking.Transport
 
 			isDisconnected = true;
 			disconnectionTimestamp = stopwatch.ElapsedMilliseconds;
+
+			connectionManager.EnqueueToDisconnectEvents (this);
 
 			for (int i = 0; i < 3; i++)
 			{
@@ -365,10 +368,6 @@ namespace ClassDev.Networking.Transport
 			message.encoder.Encode ((byte)0);
 
 			messageManager.Send (message);
-
-			// Send the same message to this host to trigger the OnDisconnect event.
-			message = new Message (message);
-			EnqueueToReceive (message);
 		}
 
 		/// <summary>
@@ -378,14 +377,6 @@ namespace ClassDev.Networking.Transport
 		{
 			isSuccessful = true;
 			SendConnectionMessage ();
-		}
-
-		/// <summary>
-		/// Sets the disconnection event as called. This is only called from the ConnectionManager.
-		/// </summary>
-		internal void SetDisconnectEventAsCalled ()
-		{
-			disconnectEventCalled = true;
 		}
 
 		/// <summary>

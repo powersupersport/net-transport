@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Threading;
 using ClassDev.Networking.Transport.LowLevel;
@@ -20,6 +21,22 @@ namespace ClassDev.Networking.Transport
 		/// Called whenever a connection has been disconnected.
 		/// </summary>
 		public event System.Action<Connection> OnDisconnect;
+		/// <summary>
+		/// Queue with all OnConnect events waiting to be invoked on the main thread.
+		/// </summary>
+		private Queue<Connection> onConnectEvents = new Queue<Connection> ();
+		/// <summary>
+		/// Queue with all OnDisconnect events waiting to be invoked on the main thread.
+		/// </summary>
+		private Queue<Connection> onDisconnectEvents = new Queue<Connection> ();
+		/// <summary>
+		/// Lock for the onConnectEvents queue.
+		/// </summary>
+		private readonly object onConnectLock = new object ();
+		/// <summary>
+		/// Lock for the onDisconnectEvents queue.
+		/// </summary>
+		private readonly object onDisconnectLock = new object ();
 
 		/// <summary>
 		/// The allocated space for connections.
@@ -114,6 +131,24 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
+		/// Calls any available events. You must call this from the main thread.
+		/// </summary>
+		public void Update ()
+		{
+			lock (onConnectLock)
+			{
+				while (onConnectEvents.Count > 0)
+					OnConnect?.Invoke (onConnectEvents.Dequeue ());
+			}
+
+			lock (onDisconnectLock)
+			{
+				while (onDisconnectEvents.Count > 0)
+					OnDisconnect?.Invoke (onDisconnectEvents.Dequeue ());
+			}
+		}
+
+		/// <summary>
 		/// Connect to another host.
 		/// </summary>
 		/// <param name="ipAddress">The IP address of the remote host.</param>
@@ -177,7 +212,7 @@ namespace ClassDev.Networking.Transport
 		}
 
 		/// <summary>
-		/// 
+		/// Resolves a connection by a specified endpoint. Returns null if there is no connection associated with the provided endpoint.
 		/// </summary>
 		/// <param name="endPoint"></param>
 		/// <param name="disconnected"></param>
@@ -243,7 +278,7 @@ namespace ClassDev.Networking.Transport
 			// This math here does the following example...
 			// With ConnectionsPerThread = 10 and maxConnections = 30:
 			// 0, 10, 20, 1, 11, 21, 2, 12, 22 etc..
-			
+
 			// This is done, so the workload is separated evenly on each thread for maximum performance.
 
 			// If the max connections are not exactly divisible, get the remaining chunk.
@@ -278,6 +313,30 @@ namespace ClassDev.Networking.Transport
 				}
 
 				return -1;
+			}
+		}
+
+		/// <summary>
+		/// Enqueues a connection to be passed in an onConnect event.
+		/// </summary>
+		/// <param name="connection"></param>
+		internal void EnqueueToConnectEvents (Connection connection)
+		{
+			lock (onConnectLock)
+			{
+				onConnectEvents.Enqueue (connection);
+			}
+		}
+
+		/// <summary>
+		/// Enqueues a connection to be passed in an onDisconnect event.
+		/// </summary>
+		/// <param name="connection"></param>
+		internal void EnqueueToDisconnectEvents (Connection connection)
+		{
+			lock (onDisconnectLock)
+			{
+				onDisconnectEvents.Enqueue (connection);
 			}
 		}
 
@@ -440,8 +499,7 @@ namespace ClassDev.Networking.Transport
 			if (!message.connection.isSuccessful)
 			{
 				message.connection.SetAsSuccessful ();
-
-				OnConnect?.Invoke (message.connection);
+				EnqueueToConnectEvents (message.connection);
 			}
 		}
 
@@ -489,12 +547,6 @@ namespace ClassDev.Networking.Transport
 				return;
 
 			message.connection.Disconnect ();
-
-			if (!message.connection.disconnectEventCalled)
-			{
-				OnDisconnect?.Invoke (message.connection);
-				message.connection.SetDisconnectEventAsCalled ();
-			}
 		}
 
 		/// <summary>
