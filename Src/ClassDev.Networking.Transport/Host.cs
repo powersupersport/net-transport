@@ -445,6 +445,8 @@ namespace ClassDev.Networking.Transport
 				if (!isStarted)
 					return;
 
+				message = null;
+
 				// If there are messages in the queues of connections.
 				message = connectionManager.Receive ();
 				if (message != null)
@@ -458,6 +460,9 @@ namespace ClassDev.Networking.Transport
 					message = new Message (lowLevelMessage);
 					HandleReceivedMessage (message);
 				}
+
+				if (message == null)
+					Thread.Sleep (1);
 			}
 		}
 

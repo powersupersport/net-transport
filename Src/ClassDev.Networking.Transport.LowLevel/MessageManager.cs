@@ -183,6 +183,8 @@ namespace ClassDev.Networking.Transport.LowLevel
 				if (!isStarted)
 					return;
 
+				message = null;
+
 				try
 				{
 					messageContent = udpClient.Receive (ref endPoint);
@@ -199,7 +201,8 @@ namespace ClassDev.Networking.Transport.LowLevel
 				}
 
 				// Even 1ms lets the processor take a break nicely :)
-				Thread.Sleep (1);
+				if (message == null)
+					Thread.Sleep (1);
 			}
 		}
 
